@@ -149,23 +149,12 @@ function LoadingState() {
 }
 
 /* ── Tab Content ── */
-function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMoodBoards, updateTab }) {
+function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMoodBoards, updateTab, requestGenerate }) {
   const resultsRef = useRef(null);
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     if (!tab.topic.trim() || !brand.trim()) return;
-    updateTab(tab.id, { loading: true, error: null, ideas: null });
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: tab.topic, platform: tab.platform, brand, audience, tone, competitors }),
-      });
-      if (!response.ok) throw new Error("API request failed");
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      updateTab(tab.id, { ideas: data.ideas, loading: false, name: tab.topic.length > 25 ? tab.topic.substring(0, 25) + "..." : tab.topic });
-      setTimeout(() => { resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
-    } catch (err) { console.error(err); updateTab(tab.id, { error: "Something went wrong. Please try again.", loading: false }); }
+    requestGenerate(tab.id, tab.topic, tab.platform, resultsRef);
   };
 
   return (
@@ -179,7 +168,13 @@ function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMo
         {competitors.length > 0 && <div style={styles.activeComps}><span style={styles.activeCompsLabel}>Analyzing:</span>{competitors.map((c, i) => <span key={i} style={styles.compChip}>{c}</span>)}</div>}
       </div>
 
-      {tab.loading && <LoadingState />}
+      {tab.queued && (
+        <div style={styles.queuedWrap}>
+          <p style={styles.queuedText}>⏳ Waiting for other tab to finish generating...</p>
+          <p style={styles.queuedSub}>Your request is queued and will start automatically.</p>
+        </div>
+      )}
+      {tab.loading && !tab.queued && <LoadingState />}
       {tab.error && <div style={styles.errorBox}>{tab.error}</div>}
 
       {tab.ideas && (
@@ -199,7 +194,7 @@ function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMo
 /* ── Main ── */
 let tabCounter = 1;
 function createTab() {
-  return { id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", ideas: null, loading: false, error: null };
+  return { id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", ideas: null, loading: false, queued: false, error: null };
 }
 
 export default function Bento() {
@@ -208,6 +203,8 @@ export default function Bento() {
   const [onboarded, setOnboarded] = useState(false); const [moodBoards, setMoodBoards] = useState({});
   const [tabs, setTabs] = useState([createTab()]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
+  const isGeneratingRef = useRef(false);
+  const queueRef = useRef([]);
 
   const updateTab = (id, updates) => {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
@@ -224,6 +221,44 @@ export default function Bento() {
     setTabs(newTabs);
     if (activeTabId === id) {
       setActiveTabId(newTabs[Math.max(0, idx - 1)].id);
+    }
+  };
+
+  // ── Queue system: one generation at a time ──
+  const runGenerate = async (tabId, topic, platform, resultsRef) => {
+    isGeneratingRef.current = true;
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, ideas: null } : t));
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, platform, brand, audience, tone, competitors }),
+      });
+      if (!response.ok) throw new Error("API request failed");
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, ideas: data.ideas, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t));
+      setTimeout(() => { resultsRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+    } catch (err) {
+      console.error(err);
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, error: "Something went wrong. Please try again.", loading: false } : t));
+    } finally {
+      isGeneratingRef.current = false;
+      // Process next in queue
+      if (queueRef.current.length > 0) {
+        const next = queueRef.current.shift();
+        runGenerate(next.tabId, next.topic, next.platform, next.resultsRef);
+      }
+    }
+  };
+
+  const requestGenerate = (tabId, topic, platform, resultsRef) => {
+    if (isGeneratingRef.current) {
+      // Queue it
+      queueRef.current = queueRef.current.filter(q => q.tabId !== tabId); // remove existing queue entry for same tab
+      queueRef.current.push({ tabId, topic, platform, resultsRef });
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, ideas: null } : t));
+    } else {
+      runGenerate(tabId, topic, platform, resultsRef);
     }
   };
 
@@ -247,7 +282,8 @@ export default function Bento() {
           {tabs.map(tab => (
             <div key={tab.id} style={{ ...styles.tab, ...(tab.id === activeTabId ? styles.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
               <span style={styles.tabName}>
-                {tab.loading && <span style={styles.tabSpinner}>⟳</span>}
+                {tab.loading && !tab.queued && <span style={styles.tabSpinner}>⟳</span>}
+                {tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}
                 {tab.name}
               </span>
               {tabs.length > 1 && (
@@ -270,6 +306,7 @@ export default function Bento() {
           moodBoards={moodBoards}
           setMoodBoards={setMoodBoards}
           updateTab={updateTab}
+          requestGenerate={requestGenerate}
         />
       </main>
     </div>
@@ -320,6 +357,9 @@ const styles = {
   loaderBox: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, width: 44, height: 44, marginBottom: 20 },
   loaderCell: { background: "#C07A8E", borderRadius: 4, animation: "bentoPulse 1s ease-in-out infinite", opacity: 0.25 },
   loadingMsg: { fontSize: 14, color: "#A39888", fontStyle: "italic" },
+  queuedWrap: { display: "flex", flexDirection: "column", alignItems: "center", padding: "80px 20px", gap: 8 },
+  queuedText: { fontSize: 15, color: "#A39888", fontWeight: 600 },
+  queuedSub: { fontSize: 13, color: "#C4B9A8" },
   errorBox: { background: "#FFF5F3", border: "1px solid #FECDCA", borderRadius: 12, padding: "14px 20px", textAlign: "center", color: "#B42318", fontSize: 13 },
   results: { marginTop: 4 }, resultsLabel: { fontSize: 15, color: "#78716C", marginBottom: 24 },
   topicHighlight: { color: "#C07A8E", fontWeight: 700 },

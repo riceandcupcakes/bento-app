@@ -177,14 +177,22 @@ function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMo
       {tab.loading && !tab.queued && <LoadingState />}
       {tab.error && <div style={styles.errorBox}>{tab.error}</div>}
 
-      {tab.ideas && (
+      {tab.idea && (
         <div ref={resultsRef} style={styles.results}>
-          <p style={styles.resultsLabel}><span style={{ fontWeight: 700 }}>3 ideas</span> for <span style={styles.topicHighlight}>"{tab.topic}"</span> on <span style={styles.topicHighlight}>{tab.platform}</span>{competitors.length > 0 && <span style={{ color: "#A39888" }}> · informed by {competitors.join(", ")}</span>}</p>
-          {tab.ideas.map((idea, i) => <IdeaCard key={i} idea={idea} index={i} tabId={tab.id} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />)}
+          <div style={styles.resultsHeader}>
+            <p style={styles.resultsLabel}>
+              Idea for <span style={styles.topicHighlight}>"{tab.topic}"</span> on <span style={styles.topicHighlight}>{tab.platform}</span>
+              {competitors.length > 0 && <span style={{ color: "#A39888" }}> · informed by {competitors.join(", ")}</span>}
+            </p>
+            <button style={styles.regenerateBtn} onClick={handleGenerate} disabled={tab.loading}>
+              ↻ Regenerate idea
+            </button>
+          </div>
+          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
         </div>
       )}
 
-      {!tab.loading && !tab.ideas && !tab.error && (
+      {!tab.loading && !tab.idea && !tab.error && (
         <div style={styles.empty}><div style={styles.emptyBento}><div style={{ ...styles.emptyCell, opacity: 0.15 }} /><div style={{ ...styles.emptyCell, opacity: 0.1 }} /><div style={{ ...styles.emptyCell, opacity: 0.08 }} /><div style={{ ...styles.emptyCell, opacity: 0.05 }} /></div><p style={styles.emptyText}>Your bento is empty. Enter a topic to start packing.</p></div>
       )}
     </div>
@@ -194,7 +202,7 @@ function TabContent({ tab, brand, audience, tone, competitors, moodBoards, setMo
 /* ── Main ── */
 let tabCounter = 1;
 function createTab() {
-  return { id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", ideas: null, loading: false, queued: false, error: null };
+  return { id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", idea: null, loading: false, queued: false, error: null };
 }
 
 export default function Bento() {
@@ -227,7 +235,7 @@ export default function Bento() {
   // ── Queue system: one generation at a time ──
   const runGenerate = async (tabId, topic, platform, resultsRef) => {
     isGeneratingRef.current = true;
-    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, ideas: null } : t));
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null } : t));
     try {
       const response = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -236,7 +244,7 @@ export default function Bento() {
       if (!response.ok) throw new Error("API request failed");
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, ideas: data.ideas, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t));
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, idea: data.idea, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t));
       setTimeout(() => { resultsRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
     } catch (err) {
       console.error(err);
@@ -256,7 +264,7 @@ export default function Bento() {
       // Queue it
       queueRef.current = queueRef.current.filter(q => q.tabId !== tabId); // remove existing queue entry for same tab
       queueRef.current.push({ tabId, topic, platform, resultsRef });
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, ideas: null } : t));
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null } : t));
     } else {
       runGenerate(tabId, topic, platform, resultsRef);
     }
@@ -361,7 +369,10 @@ const styles = {
   queuedText: { fontSize: 15, color: "#A39888", fontWeight: 600 },
   queuedSub: { fontSize: 13, color: "#C4B9A8" },
   errorBox: { background: "#FFF5F3", border: "1px solid #FECDCA", borderRadius: 12, padding: "14px 20px", textAlign: "center", color: "#B42318", fontSize: 13 },
-  results: { marginTop: 4 }, resultsLabel: { fontSize: 15, color: "#78716C", marginBottom: 24 },
+  results: { marginTop: 4 },
+  resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
+  resultsLabel: { fontSize: 15, color: "#78716C", margin: 0 },
+  regenerateBtn: { padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   topicHighlight: { color: "#C07A8E", fontWeight: 700 },
   bentoBox: { border: "1.5px solid #E8E2D9", borderRadius: 18, overflow: "hidden", marginBottom: 28, background: "#FFF", boxShadow: "0 2px 16px rgba(0,0,0,0.03)" },
   bentoTop: { padding: "22px 28px 18px", borderBottom: "1px solid #E8E2D9" },

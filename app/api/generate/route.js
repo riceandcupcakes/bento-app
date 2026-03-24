@@ -19,7 +19,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 16000,
+        max_tokens: 8000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }],
       }),
@@ -37,7 +37,7 @@ export async function POST(request) {
       .map((b) => b.text)
       .join("");
 
-    const jsonMatch = text.match(/\{[\s\S]*"ideas"[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*"idea"[\s\S]*\}/);
     if (!jsonMatch) {
       console.error("No JSON found in response:", text.substring(0, 500));
       return Response.json({ error: "Failed to parse AI response" }, { status: 500 });
@@ -46,7 +46,13 @@ export async function POST(request) {
     const clean = jsonMatch[0].replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
-    return Response.json(parsed);
+    // Normalize: support both { idea: {} } and { ideas: [] }
+    const idea = parsed.idea || (parsed.ideas && parsed.ideas[0]);
+    if (!idea) {
+      return Response.json({ error: "No idea generated" }, { status: 500 });
+    }
+
+    return Response.json({ idea });
   } catch (err) {
     console.error("Generate error:", err);
     return Response.json({ error: "Something went wrong" }, { status: 500 });
@@ -94,10 +100,10 @@ ${platformBestPractices[platform] || ""}
 
 STEP 1: Research the brand's visual identity via web search. All visual direction must align with this brand.
 STEP 2: Research the ACTUAL SUBJECT MATTER of "${topic}" — science, facts, expert opinions. NOT social media strategy.
-STEP 3: Generate 3 ideas using DIFFERENT formats:
+STEP 3: Generate 1 content idea using one of these formats (pick the best fit for this topic):
 ${platformFormats[platform] || ""}
 
-For each idea:
+For the idea:
 1. **angle**: Hook or headline
 2. **format**: Content format
 3. **research**: 4 points about THE ACTUAL TOPIC with <key> tags. Real URLs for sources.
@@ -111,19 +117,17 @@ For each idea:
 
 JSON only:
 {
-  "ideas": [
-    {
-      "angle": "string", "format": "string",
-      "research": [{"point": "string (<key>...</key>)", "source": "string (Name — url)"}],
-      "brief": [{"step": "string", "content": "string"}],
-      "why": "string",
-      "visual_direction": {
-        "mood": "string",
-        "layout": "string (• bullets)",
-        "imagery_and_icons": "string (• bullets)",
-        "references": [{"handle": "string (${refFormat})", "note": "string (what to study/take away)"}]
-      }
+  "idea": {
+    "angle": "string", "format": "string",
+    "research": [{"point": "string (<key>...</key>)", "source": "string (Name — url)"}],
+    "brief": [{"step": "string", "content": "string"}],
+    "why": "string",
+    "visual_direction": {
+      "mood": "string",
+      "layout": "string (• bullets)",
+      "imagery_and_icons": "string (• bullets)",
+      "references": [{"handle": "string (${refFormat})", "note": "string (what to study/take away)"}]
     }
-  ]
+  }
 }`;
 }

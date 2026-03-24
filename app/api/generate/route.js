@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 export async function POST(request) {
   const { topic, platform, brand, audience, tone, competitors } = await request.json();
 

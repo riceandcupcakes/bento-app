@@ -3,3 +3,7 @@ body { font-family: "Instrument Sans", "Helvetica Neue", sans-serif; background:
 @keyframes bentoPulse { 0%, 100% { opacity: 0.2; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.06); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 input:focus, textarea:focus, select:focus { border-color: #c07a8e !important; box-shadow: 0 0 0 3px rgba(192, 122, 142, 0.08); outline: none; }
+::-webkit-scrollbar { height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #DDD5CA; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #C4B9A8; }

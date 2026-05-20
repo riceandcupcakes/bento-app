@@ -3,274 +3,104 @@
 import { useState, useEffect, useRef } from "react";
 
 const PLATFORMS = ["Instagram", "TikTok", "LinkedIn", "Blog", "Twitter"];
-
 const ACCENT_SETS = [
   { bg: "#FFF4F2", border: "#D4857A", tag: "#D4857A", tagBg: "#FFE9E5" },
   { bg: "#F8F1FB", border: "#9B72AA", tag: "#9B72AA", tagBg: "#F0E4F6" },
   { bg: "#F1F7F3", border: "#6B937A", tag: "#6B937A", tagBg: "#E1EDE5" },
 ];
 
-/* ── Settings Modal ── */
-function SettingsModal({ brand, audience, tone, brandStyle, competitors, onSave, onClose }) {
-  const [db, setDb] = useState(brand); const [da, setDa] = useState(audience); const [dt, setDt] = useState(tone);
-  const [ds, setDs] = useState(brandStyle);
-  const [dc, setDc] = useState(() => { const a = [...competitors]; while (a.length < 3) a.push(""); return a; });
-  const uc = (i, v) => { const n = [...dc]; n[i] = v; setDc(n); };
-  return (
-    <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
-        <div style={styles.modalHeader}><h2 style={styles.modalTitle}>Settings</h2><button style={styles.closeBtn} onClick={onClose}>✕</button></div>
-        <div style={styles.settingsSection}><label style={styles.settingsLabel}>Brand</label><p style={styles.settingsHint}>Brand name or URL.</p><input style={styles.textInput} value={db} onChange={e => setDb(e.target.value)} placeholder="https://www.forhers.com/" /></div>
-        <div style={styles.settingsSection}><label style={styles.settingsLabel}>Target Audience</label><textarea style={styles.brandTextarea} value={da} onChange={e => setDa(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
-        <div style={styles.settingsSection}><label style={styles.settingsLabel}>Tone of Voice</label><input style={styles.textInput} value={dt} onChange={e => setDt(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
-        <div style={styles.settingsSection}><label style={styles.settingsLabel}>Brand Visual Style</label><p style={styles.settingsHint}>Describe your brand's visual identity so Bento can tailor creative direction.</p><textarea style={styles.brandTextarea} value={ds} onChange={e => setDs(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones with peach/coral accents. Clean sans-serif typography. Lifestyle photography with warm lighting. Flat line icons."' rows={3} /></div>
-        <div style={styles.settingsSection}><label style={styles.settingsLabel}>Competitors <span style={styles.optionalTag}>optional — up to 3</span></label>{dc.map((c, i) => <input key={i} style={{ ...styles.textInput, marginBottom: 8 }} value={c} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button style={styles.secondaryBtn} onClick={onClose}>Cancel</button>
-          <button style={{ ...styles.primaryBtn, opacity: db.trim() && da.trim() && dt.trim() ? 1 : 0.4 }} onClick={() => { if (db.trim() && da.trim() && dt.trim()) { onSave(db.trim(), da.trim(), dt.trim(), ds.trim(), dc.filter(c => c.trim())); onClose(); } }}>Save</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* ══════════════════════════════════════════
+   Storage
+   ══════════════════════════════════════════ */
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+function load(key, fb) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch { return fb; } }
 
-/* ── Onboarding ── */
-function Onboarding({ onComplete }) {
-  const [b, setB] = useState(""); const [a, setA] = useState(""); const [t, setT] = useState(""); const [s, setS] = useState("");
-  const [c, setC] = useState(["", "", ""]);
-  const uc = (i, v) => { const n = [...c]; n[i] = v; setC(n); };
-  return (
-    <div style={styles.onboarding}>
-      <div style={styles.onboardingCard}>
-        <div style={styles.onboardingBento}><div style={styles.obCell1}/><div style={styles.obCell2}/><div style={styles.obCell3}/><div style={styles.obCell4}/></div>
-        <h1 style={styles.obTitle}>Bento</h1><p style={styles.obSub}>Content ideas, neatly packed.</p>
-        <div style={styles.obSection}><label style={styles.obLabel}>Brand</label><p style={styles.obHint}>Brand name or website URL.</p><input style={styles.textInput} value={b} onChange={e => setB(e.target.value)} placeholder="https://www.forhers.com/" /></div>
-        <div style={styles.obSection}><label style={styles.obLabel}>Target Audience</label><textarea style={styles.brandTextarea} value={a} onChange={e => setA(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
-        <div style={styles.obSection}><label style={styles.obLabel}>Tone of Voice</label><input style={styles.textInput} value={t} onChange={e => setT(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
-        <div style={styles.obSection}><label style={styles.obLabel}>Brand Visual Style <span style={styles.optionalTag}>optional</span></label><p style={styles.obHint}>Describe your brand's look — colors, typography, photography style. Helps Bento tailor creative direction.</p><textarea style={styles.brandTextarea} value={s} onChange={e => setS(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones with peach/coral accents. Clean sans-serif typography. Lifestyle photography with warm lighting."' rows={2} /></div>
-        <div style={styles.obSection}><label style={styles.obLabel}>Competitors <span style={styles.optionalTag}>optional — up to 3</span></label><p style={styles.obHint}>Bento will study their content to help you differentiate.</p>{c.map((v, i) => <input key={i} style={{ ...styles.textInput, marginBottom: 8 }} value={v} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
-        <button style={{ ...styles.primaryBtn, marginTop: 16, width: "100%", opacity: b.trim() && a.trim() && t.trim() ? 1 : 0.4 }} onClick={() => { if (b.trim() && a.trim() && t.trim()) onComplete(b.trim(), a.trim(), t.trim(), s.trim(), c.filter(v => v.trim())); }}>Get started →</button>
-      </div>
-    </div>
-  );
-}
-
-/* ── Display Components ── */
+/* ══════════════════════════════════════════
+   Display Components
+   ══════════════════════════════════════════ */
 function ResearchPoint({ text }) {
-  return (<span>{(text || "").split(/(<key>.*?<\/key>)/g).map((p, i) => p.startsWith("<key>") ? <span key={i} style={styles.keyHighlight}>{p.replace(/<\/?key>/g, "")}</span> : <span key={i}>{p}</span>)}</span>);
+  return <span>{(text || "").split(/(<key>.*?<\/key>)/g).map((p, i) => p.startsWith("<key>") ? <span key={i} style={S.keyHighlight}>{p.replace(/<\/?key>/g, "")}</span> : <span key={i}>{p}</span>)}</span>;
 }
+
 function SourceLink({ source }) {
   const m = (source || "").match(/(https?:\/\/[^\s)]+)/);
-  if (m) { const u = m[1]; const l = source.replace(u, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(); const s = u.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return (<span style={styles.sourceText}>{l && <>{l} — </>}<a href={u} target="_blank" rel="noopener noreferrer" style={styles.sourceLink}>{s}</a></span>); }
-  return <span style={styles.sourceText}>{source}</span>;
+  if (m) { const u = m[1], l = source.replace(u, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(), s = u.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return <span style={S.sourceText}>{l && <>{l} — </>}<a href={u} target="_blank" rel="noopener noreferrer" style={S.sourceLink}>{s}</a></span>; }
+  return <span style={S.sourceText}>{source}</span>;
 }
+
 function BriefContent({ content }) {
   const lines = (content || "").split(/\n|(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway):)/gi);
   const parsed = []; let cur = null;
   for (const l of lines) { const m = l.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway)\s*:\s*(.*)/i); if (m) { if (cur) parsed.push(cur); cur = { label: m[1], text: m[2].trim() }; } else if (l.trim()) { if (cur) cur.text += " " + l.trim(); else parsed.push({ label: null, text: l.trim() }); } }
   if (cur) parsed.push(cur);
-  if (parsed.some(p => p.label)) return (<div style={styles.briefStructured}>{parsed.map((p, i) => <div key={i} style={styles.briefLine}>{p.label && <span style={styles.briefLabel}>{p.label}:</span>}<span style={styles.briefValue}>{p.text}</span></div>)}</div>);
-  return <p style={styles.stepContent}>{content}</p>;
+  if (parsed.some(p => p.label)) return <div style={S.briefStructured}>{parsed.map((p, i) => <div key={i} style={S.briefLine}>{p.label && <span style={S.briefLabel}>{p.label}:</span>}<span style={S.briefValue}>{p.text}</span></div>)}</div>;
+  return <p style={S.stepContent}>{content}</p>;
 }
+
 function BulletedText({ text }) {
   if (!text) return null;
   const bullets = text.split("•").map(s => s.trim()).filter(Boolean);
-  if (bullets.length <= 1) return <p style={styles.vdText}>{text}</p>;
-  return (<div style={styles.bulletList}>{bullets.map((b, i) => <div key={i} style={styles.bulletItem}><span style={styles.bulletDot}/><span style={styles.bulletText}>{b}</span></div>)}</div>);
+  if (bullets.length <= 1) return <p style={S.vdText}>{text}</p>;
+  return <div style={S.bulletList}>{bullets.map((b, i) => <div key={i} style={S.bulletItem}><span style={S.bulletDot}/><span style={S.bulletText}>{b}</span></div>)}</div>;
 }
 
-/* ── Visual Direction ── */
 function VisualDirection({ vd }) {
   if (!vd) return null;
   const refs = vd.references || vd.reference_accounts || [];
   const hasUrls = refs.some(r => r.handle && r.handle.match(/https?:\/\//));
-  const refTitle = hasUrls ? "Reference articles" : "Study these accounts";
   return (
-    <div style={styles.vdSection}>
-      <div style={styles.compartmentLabel}><span>🎨</span> Visual Direction</div>
-      <div style={styles.vdGrid}>
-        <div style={styles.vdCard}><div style={styles.vdCardLabel}>Mood</div><p style={styles.vdMood}>{vd.mood}</p></div>
-        <div style={styles.vdCard}><div style={styles.vdCardLabel}>Layout</div><BulletedText text={vd.layout} /></div>
-        <div style={styles.vdCard}><div style={styles.vdCardLabel}>Creative Concept</div><BulletedText text={vd.creative_concept || vd.imagery_and_icons} /></div>
-        {refs.length > 0 && <div style={styles.vdCard}><div style={styles.vdCardLabel}>{refTitle}</div><div style={styles.refList}>{refs.map((r, i) => {
-          const urlMatch = r.handle && r.handle.match(/(https?:\/\/[^\s]+)/);
-          if (urlMatch) { const url = urlMatch[1]; const label = r.handle.replace(url, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(); const short = url.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return (<div key={i} style={styles.refItem}><a href={url} target="_blank" rel="noopener noreferrer" style={styles.refLink}>{label || short}</a><span style={styles.refNote}>{r.note}</span></div>); }
-          return (<div key={i} style={styles.refItem}><span style={styles.refHandle}>{r.handle}</span><span style={styles.refNote}>{r.note}</span></div>);
+    <div style={S.vdSection}>
+      <div style={S.compartmentLabel}><span>🎨</span> Visual Direction</div>
+      <div style={S.vdGrid}>
+        <div style={S.vdCard}><div style={S.vdCardLabel}>Mood</div><p style={S.vdMood}>{vd.mood}</p></div>
+        <div style={S.vdCard}><div style={S.vdCardLabel}>Layout</div><BulletedText text={vd.layout} /></div>
+        <div style={S.vdCard}><div style={S.vdCardLabel}>Creative Concept</div><BulletedText text={vd.creative_concept || vd.imagery_and_icons} /></div>
+        {refs.length > 0 && <div style={S.vdCard}><div style={S.vdCardLabel}>{hasUrls ? "Reference articles" : "Study these accounts"}</div><div style={S.refList}>{refs.map((r, i) => {
+          const um = r.handle && r.handle.match(/(https?:\/\/[^\s]+)/);
+          if (um) { const url = um[1], label = r.handle.replace(url, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(), short = url.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return <div key={i} style={S.refItem}><a href={url} target="_blank" rel="noopener noreferrer" style={S.refLink}>{label || short}</a><span style={S.refNote}>{r.note}</span></div>; }
+          return <div key={i} style={S.refItem}><span style={S.refHandle}>{r.handle}</span><span style={S.refNote}>{r.note}</span></div>;
         })}</div></div>}
       </div>
     </div>
   );
 }
 
-/* ── Mood Board ── */
-function MoodBoard({ tabId, ideaIndex, moodBoards, setMoodBoards }) {
-  const [inputUrl, setInputUrl] = useState(""); const [inputNote, setInputNote] = useState("");
-  const key = `${tabId}-${ideaIndex}`;
-  const boards = moodBoards[key] || [];
-  const addItem = () => { if (!inputUrl.trim()) return; const n = { ...moodBoards }; if (!n[key]) n[key] = []; n[key] = [...n[key], { url: inputUrl.trim(), note: inputNote.trim() }]; setMoodBoards(n); setInputUrl(""); setInputNote(""); };
-  const removeItem = (idx) => { const n = { ...moodBoards }; n[key] = n[key].filter((_, i) => i !== idx); setMoodBoards(n); };
-  const getDomain = (u) => { try { return u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]; } catch { return "link"; } };
+function MoodBoard({ boardKey, moodBoards, setMoodBoards }) {
+  const [url, setUrl] = useState(""); const [note, setNote] = useState("");
+  const boards = moodBoards[boardKey] || [];
+  const add = () => { if (!url.trim()) return; const n = { ...moodBoards }; if (!n[boardKey]) n[boardKey] = []; n[boardKey] = [...n[boardKey], { url: url.trim(), note: note.trim() }]; setMoodBoards(n); setUrl(""); setNote(""); };
+  const remove = (idx) => { const n = { ...moodBoards }; n[boardKey] = n[boardKey].filter((_, i) => i !== idx); setMoodBoards(n); };
+  const domain = (u) => { try { return u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]; } catch { return "link"; } };
   return (
-    <div style={styles.moodSection}>
-      <div style={styles.compartmentLabel}><span>📌</span> My Mood Board</div>
-      {boards.length > 0 && <div style={styles.moodGrid}>{boards.map((item, i) => <div key={i} style={styles.moodItem}><div style={styles.moodItemTop}><a href={item.url} target="_blank" rel="noopener noreferrer" style={styles.moodLink}>{getDomain(item.url)} ↗</a><button style={styles.moodRemove} onClick={() => removeItem(i)}>✕</button></div>{item.note && <span style={styles.moodNote}>{item.note}</span>}</div>)}</div>}
-      <div style={styles.moodInput}>
-        <input style={{ ...styles.textInput, flex: 2 }} value={inputUrl} onChange={e => setInputUrl(e.target.value)} placeholder="Paste a link..." onKeyDown={e => { if (e.key === "Enter") addItem(); }} />
-        <input style={{ ...styles.textInput, flex: 1.5 }} value={inputNote} onChange={e => setInputNote(e.target.value)} placeholder="Note (optional)" onKeyDown={e => { if (e.key === "Enter") addItem(); }} />
-        <button style={styles.moodAddBtn} onClick={addItem}>+ Add</button>
+    <div style={S.moodSection}>
+      <div style={S.compartmentLabel}><span>📌</span> My Mood Board</div>
+      {boards.length > 0 && <div style={S.moodGrid}>{boards.map((item, i) => <div key={i} style={S.moodItem}><div style={S.moodItemTop}><a href={item.url} target="_blank" rel="noopener noreferrer" style={S.moodLink}>{domain(item.url)} ↗</a><button style={S.moodRemove} onClick={() => remove(i)}>✕</button></div>{item.note && <span style={S.moodNote}>{item.note}</span>}</div>)}</div>}
+      <div style={S.moodInput}>
+        <input style={{ ...S.textInput, flex: 2 }} value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a link..." onKeyDown={e => { if (e.key === "Enter") add(); }} />
+        <input style={{ ...S.textInput, flex: 1.5 }} value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" onKeyDown={e => { if (e.key === "Enter") add(); }} />
+        <button style={S.moodAddBtn} onClick={add}>+ Add</button>
       </div>
     </div>
   );
 }
 
-/* ── Social Preview ── */
-function SocialPreview({ idea, platform }) {
-  const brief = idea.brief || [];
-  const format = (idea.format || "").toLowerCase();
-
-  // Extract text from brief content
-  const extractField = (content, field) => {
-    const m = (content || "").match(new RegExp(`${field}:\\s*(.*)`, "i"));
-    return m ? m[1].trim() : "";
-  };
-
-  // ── Instagram / Carousel ──
-  if (platform === "Instagram" && (format.includes("carousel") || format.includes("multi-slide"))) {
-    return (
-      <div style={styles.previewSection}>
-        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-        <div style={styles.carouselScroll}>
-          {brief.map((slide, i) => (
-            <div key={i} style={styles.igSlide}>
-              <div style={styles.igSlideNum}>{i + 1}</div>
-              <h4 style={styles.igSlideHeadline}>{extractField(slide.content, "Headline") || slide.step}</h4>
-              <p style={styles.igSlideBody}>{extractField(slide.content, "Body")}</p>
-              <p style={styles.igSlideVisual}>{extractField(slide.content, "Visual")}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Instagram / Reel or TikTok ──
-  if (platform === "TikTok" || format.includes("reel") || format.includes("video") || format.includes("short")) {
-    return (
-      <div style={styles.previewSection}>
-        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-        <div style={styles.reelFrame}>
-          <div style={styles.reelContent}>
-            {brief.map((scene, i) => (
-              <div key={i} style={styles.reelScene}>
-                <div style={styles.reelTiming}>{extractField(scene.content, "Timing") || scene.step}</div>
-                <p style={styles.reelText}>{extractField(scene.content, "On-screen text") || extractField(scene.content, "Text")}</p>
-                <p style={styles.reelVo}>{extractField(scene.content, "Voiceover")}</p>
-              </div>
-            ))}
-          </div>
-          <div style={styles.reelSidebar}>
-            <div style={styles.reelIcon}>♥</div>
-            <div style={styles.reelIcon}>💬</div>
-            <div style={styles.reelIcon}>↗</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── LinkedIn ──
-  if (platform === "LinkedIn") {
-    const hook = extractField(brief[0]?.content, "Hook") || extractField(brief[0]?.content, "Headline") || brief[0]?.content || "";
-    const body = extractField(brief[0]?.content, "Body") || (brief.length > 1 ? brief.slice(1).map(b => extractField(b.content, "Body") || b.content).join(" ") : "");
-    const cta = brief.map(b => extractField(b.content, "CTA")).filter(Boolean).join(" ");
-    return (
-      <div style={styles.previewSection}>
-        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-        <div style={styles.liPost}>
-          <div style={styles.liHeader}><div style={styles.liAvatar} /><div><div style={styles.liName}>Your Brand</div><div style={styles.liMeta}>Content Marketing · 1h</div></div></div>
-          <div style={styles.liBody}><p style={styles.liHook}>{hook.substring(0, 150)}{hook.length > 150 ? "..." : ""}</p><p style={styles.liText}>{body.substring(0, 200)}{body.length > 200 ? "..." : ""}</p>{cta && <p style={styles.liCta}>{cta}</p>}</div>
-          <div style={styles.liActions}><span>👍 Like</span><span>💬 Comment</span><span>↗ Repost</span><span>📤 Send</span></div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Twitter ──
-  if (platform === "Twitter") {
-    return (
-      <div style={styles.previewSection}>
-        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-        <div style={styles.tweetThread}>
-          {brief.slice(0, 5).map((tweet, i) => (
-            <div key={i} style={styles.tweetCard}>
-              <div style={styles.tweetHeader}><div style={styles.tweetAvatar} /><div><span style={styles.tweetName}>Your Brand</span><span style={styles.tweetHandle}>@yourbrand</span></div></div>
-              <p style={styles.tweetBody}>{(extractField(tweet.content, "Hook") || extractField(tweet.content, "Body") || extractField(tweet.content, "Text") || tweet.content || "").substring(0, 280)}</p>
-              {i < brief.length - 1 && <div style={styles.tweetThreadLine} />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Blog ──
-  if (platform === "Blog") {
-    return (
-      <div style={styles.previewSection}>
-        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-        <div style={styles.blogPreview}>
-          <h2 style={styles.blogTitle}>{idea.angle}</h2>
-          <div style={styles.blogMeta}>By Your Brand · {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
-          {brief.slice(0, 4).map((section, i) => (
-            <div key={i} style={styles.blogSection}>
-              <h3 style={styles.blogH2}>{extractField(section.content, "H2") || section.step}</h3>
-              <p style={styles.blogBody}>{(extractField(section.content, "Key points") || extractField(section.content, "Body") || "").substring(0, 120)}...</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Instagram Single Image / Infographic / fallback ──
+function IdeaCard({ idea, index, boardKey, moodBoards, setMoodBoards, onSave, isSaved }) {
+  const c = ACCENT_SETS[index % 3];
   return (
-    <div style={styles.previewSection}>
-      <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
-      <div style={styles.igSingle}>
-        <div style={styles.igSingleHeader}><div style={styles.igSingleAvatar} /><span style={styles.igSingleName}>yourbrand</span></div>
-        <div style={styles.igSingleImage}>
-          <h4 style={styles.igSingleHeadline}>{extractField(brief[0]?.content, "Headline") || idea.angle}</h4>
-          <p style={styles.igSingleBody}>{(extractField(brief[0]?.content, "Body") || "").substring(0, 100)}</p>
-        </div>
-        <div style={styles.igSingleActions}><span>♥</span><span>💬</span><span>↗</span></div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Idea Card ── */
-function IdeaCard({ idea, index, tabId, platform, moodBoards, setMoodBoards, onSave, isSaved }) {
-  const colors = ACCENT_SETS[index % 3];
-  return (
-    <div style={{ ...styles.bentoBox, borderColor: colors.border }}>
-      <div style={{ ...styles.bentoTop, background: colors.bg }}>
+    <div style={{ ...S.bentoBox, borderColor: c.border }}>
+      <div style={{ ...S.bentoTop, background: c.bg }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div><div style={{ ...styles.formatTag, background: colors.tagBg, color: colors.tag }}>{idea.format}</div><h3 style={styles.angleTitle}>{idea.angle}</h3></div>
-          {onSave && (
-            <button style={isSaved ? styles.savedBtn : styles.saveBtn} onClick={onSave} disabled={isSaved}>
-              {isSaved ? "✓ Saved" : "Save"}
-            </button>
-          )}
+          <div><div style={{ ...S.formatTag, background: c.tagBg, color: c.tag }}>{idea.format}</div><h3 style={S.angleTitle}>{idea.angle}</h3></div>
+          {onSave && <button style={isSaved ? S.savedBtnDone : S.saveBtn} onClick={onSave} disabled={isSaved}>{isSaved ? "✓ Saved" : "Save"}</button>}
         </div>
       </div>
-      <div style={styles.bentoGrid}>
-        <div style={styles.bentoLeft}><div style={styles.compartmentLabel}><span>🔬</span> Research</div><div style={styles.researchStack}>{(idea.research || []).map((r, i) => <div key={i} style={styles.researchCard}><p style={styles.researchText}><ResearchPoint text={r.point} /></p><SourceLink source={r.source} /></div>)}</div></div>
-        <div style={styles.bentoRight}><div style={styles.compartmentLabel}><span>📋</span> Content Brief</div><div style={styles.briefStack}>{(idea.brief || []).map((b, i) => <div key={i} style={styles.briefStep}><div style={{ ...styles.stepLabel, color: colors.tag, background: colors.tagBg }}>{b.step}</div><BriefContent content={b.content} /></div>)}</div></div>
+      <div style={S.bentoGrid}>
+        <div style={S.bentoLeft}><div style={S.compartmentLabel}><span>🔬</span> Research</div><div style={S.researchStack}>{(idea.research || []).map((r, i) => <div key={i} style={S.researchCard}><p style={S.researchText}><ResearchPoint text={r.point} /></p><SourceLink source={r.source} /></div>)}</div></div>
+        <div style={S.bentoRight}><div style={S.compartmentLabel}><span>📋</span> Content Brief</div><div style={S.briefStack}>{(idea.brief || []).map((b, i) => <div key={i} style={S.briefStep}><div style={{ ...S.stepLabel, color: c.tag, background: c.tagBg }}>{b.step}</div><BriefContent content={b.content} /></div>)}</div></div>
       </div>
-      {platform && <SocialPreview idea={idea} platform={platform} />}
       <VisualDirection vd={idea.visual_direction} />
-      <MoodBoard tabId={tabId} ideaIndex={index} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
-      <div style={{ ...styles.bentoBottom, borderTopColor: colors.border }}><span style={styles.whyLabel}>✨ Why this works</span><p style={styles.whyText}>{idea.why}</p></div>
+      <MoodBoard boardKey={boardKey} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
+      <div style={{ ...S.bentoBottom, borderTopColor: c.border }}><span style={S.whyLabel}>✨ Why this works</span><p style={S.whyText}>{idea.why}</p></div>
     </div>
   );
 }
@@ -279,381 +109,406 @@ function LoadingState() {
   const msgs = ["Researching the topic...", "Crafting your content brief...", "Building visual direction...", "Packing your bento..."];
   const [i, setI] = useState(0);
   useEffect(() => { const t = setInterval(() => setI(n => (n + 1) % msgs.length), 2500); return () => clearInterval(t); }, []);
-  return (<div style={styles.loadingWrap}><div style={styles.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...styles.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div><p style={styles.loadingMsg}>{msgs[i]}</p></div>);
+  return <div style={S.loadingWrap}><div style={S.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...S.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div><p style={S.loadingMsg}>{msgs[i]}</p></div>;
 }
 
-/* ── Usage Counter ── */
 function UsageCounter({ usage }) {
   if (!usage) return null;
-  return (
-    <div style={styles.usageBar}>
-      <span style={styles.usageItem}>Tokens: {(usage.input_tokens + usage.output_tokens).toLocaleString()}</span>
-      <span style={styles.usageDot}>·</span>
-      <span style={styles.usageItem}>Cost: ${usage.cost}</span>
-    </div>
-  );
+  return <div style={S.usageBar}><span style={S.usageItem}>Tokens: {(usage.input_tokens + usage.output_tokens).toLocaleString()}</span><span style={S.usageDot}>·</span><span style={S.usageItem}>Cost: ${usage.cost}</span></div>;
 }
 
-/* ── Save to Folder Modal ── */
-function SaveToFolderModal({ folders, onSave, onClose }) {
-  const [selectedFolder, setSelectedFolder] = useState(folders[0]?.id || "");
-  const [newFolderName, setNewFolderName] = useState("");
-  const [showNew, setShowNew] = useState(false);
+/* ══════════════════════════════════════════
+   Modals
+   ══════════════════════════════════════════ */
+function SettingsModal({ project, onSave, onClose }) {
+  const [db, setDb] = useState(project.brand); const [da, setDa] = useState(project.audience); const [dt, setDt] = useState(project.tone);
+  const [ds, setDs] = useState(project.brandStyle || ""); const [dn, setDn] = useState(project.name);
+  const [dc, setDc] = useState(() => { const a = [...(project.competitors || [])]; while (a.length < 3) a.push(""); return a; });
+  const uc = (i, v) => { const n = [...dc]; n[i] = v; setDc(n); };
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={{ ...styles.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-        <div style={styles.modalHeader}><h2 style={styles.modalTitle}>Save to folder</h2><button style={styles.closeBtn} onClick={onClose}>✕</button></div>
-        {folders.length > 0 && !showNew && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-            {folders.map(f => (
-              <div key={f.id} style={{ ...styles.folderOption, ...(selectedFolder === f.id ? styles.folderOptionActive : {}) }} onClick={() => setSelectedFolder(f.id)}>
-                <span>📁 {f.name}</span>
-                <span style={styles.folderCount}>{f.count || 0}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {showNew ? (
-          <div style={{ marginBottom: 16 }}>
-            <input style={styles.textInput} value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && newFolderName.trim()) onSave(null, newFolderName.trim()); }} />
-          </div>
-        ) : (
-          <button style={{ ...styles.secondaryBtn, width: "100%", marginBottom: 16 }} onClick={() => setShowNew(true)}>+ New folder</button>
-        )}
-        <div style={{ display: "flex", gap: 10 }}>
-          <button style={styles.secondaryBtn} onClick={onClose}>Cancel</button>
-          <button style={{ ...styles.primaryBtn, opacity: (showNew ? newFolderName.trim() : selectedFolder) ? 1 : 0.4 }}
-            onClick={() => { if (showNew && newFolderName.trim()) onSave(null, newFolderName.trim()); else if (selectedFolder) onSave(selectedFolder, null); }}>
-            Save
-          </button>
-        </div>
+    <div style={S.modalOverlay} onClick={onClose}><div style={S.modal} onClick={e => e.stopPropagation()}>
+      <div style={S.modalHeader}><h2 style={S.modalTitle}>Project Settings</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Project Name</label><input style={S.textInput} value={dn} onChange={e => setDn(e.target.value)} placeholder="e.g., hers, Brand Y" /></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Brand</label><p style={S.settingsHint}>Brand name or URL.</p><input style={S.textInput} value={db} onChange={e => setDb(e.target.value)} placeholder="https://www.forhers.com/" /></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Target Audience</label><textarea style={S.brandTextarea} value={da} onChange={e => setDa(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Tone of Voice</label><input style={S.textInput} value={dt} onChange={e => setDt(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Brand Visual Style</label><p style={S.settingsHint}>Describe your brand's visual identity.</p><textarea style={S.brandTextarea} value={ds} onChange={e => setDs(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones..."' rows={2} /></div>
+      <div style={S.settingsSection}><label style={S.settingsLabel}>Competitors <span style={S.optionalTag}>optional — up to 3</span></label>{dc.map((c, i) => <input key={i} style={{ ...S.textInput, marginBottom: 8 }} value={c} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
+      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
+        <button style={{ ...S.primaryBtn, opacity: db.trim() && da.trim() && dt.trim() && dn.trim() ? 1 : 0.4 }} onClick={() => { if (db.trim() && da.trim() && dt.trim() && dn.trim()) { onSave({ ...project, name: dn.trim(), brand: db.trim(), audience: da.trim(), tone: dt.trim(), brandStyle: ds.trim(), competitors: dc.filter(c => c.trim()) }); onClose(); } }}>Save</button>
       </div>
-    </div>
+    </div></div>
   );
 }
 
-/* ── Saved View ── */
-function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea }) {
+function SaveToFolderModal({ folders, onSave, onClose }) {
+  const [sel, setSel] = useState(folders[0]?.id || ""); const [newName, setNewName] = useState(""); const [showNew, setShowNew] = useState(false);
+  return (
+    <div style={S.modalOverlay} onClick={onClose}><div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+      <div style={S.modalHeader}><h2 style={S.modalTitle}>Save to folder</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
+      {folders.length > 0 && !showNew && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>{folders.map(f => <div key={f.id} style={{ ...S.folderOption, ...(sel === f.id ? S.folderOptionActive : {}) }} onClick={() => setSel(f.id)}><span>📁 {f.name}</span><span style={S.folderCount}>{f.count || 0}</span></div>)}</div>}
+      {showNew ? <div style={{ marginBottom: 16 }}><input style={S.textInput} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && newName.trim()) onSave(null, newName.trim()); }} /></div> : <button style={{ ...S.secondaryBtn, width: "100%", marginBottom: 16 }} onClick={() => setShowNew(true)}>+ New folder</button>}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
+        <button style={{ ...S.primaryBtn, opacity: (showNew ? newName.trim() : sel) ? 1 : 0.4 }} onClick={() => { if (showNew && newName.trim()) onSave(null, newName.trim()); else if (sel) onSave(sel, null); }}>Save</button>
+      </div>
+    </div></div>
+  );
+}
+
+function NewFolderModal({ onSave, onClose }) {
+  const [name, setName] = useState("");
+  return (
+    <div style={S.modalOverlay} onClick={onClose}><div style={{ ...S.modal, maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+      <div style={S.modalHeader}><h2 style={S.modalTitle}>New folder</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
+      <input style={S.textInput} value={name} onChange={e => setName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && name.trim()) { onSave(name.trim()); onClose(); } }} />
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
+        <button style={{ ...S.primaryBtn, opacity: name.trim() ? 1 : 0.4 }} onClick={() => { if (name.trim()) { onSave(name.trim()); onClose(); } }}>Create</button>
+      </div>
+    </div></div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   Project Setup (onboarding for new project)
+   ══════════════════════════════════════════ */
+function ProjectSetup({ onComplete, isFirst }) {
+  const [n, setN] = useState(""); const [b, setB] = useState(""); const [a, setA] = useState(""); const [t, setT] = useState(""); const [s, setS] = useState("");
+  const [c, setC] = useState(["", "", ""]);
+  const uc = (i, v) => { const arr = [...c]; arr[i] = v; setC(arr); };
+  const ok = n.trim() && b.trim() && a.trim() && t.trim();
+  return (
+    <div style={S.onboarding}><div style={S.onboardingCard}>
+      <div style={S.onboardingBento}><div style={S.obCell1}/><div style={S.obCell2}/><div style={S.obCell3}/><div style={S.obCell4}/></div>
+      <h1 style={S.obTitle}>{isFirst ? "Bento" : "New Project"}</h1>
+      <p style={S.obSub}>{isFirst ? "Content ideas, neatly packed." : "Set up a new brand workspace."}</p>
+      <div style={S.obSection}><label style={S.obLabel}>Project Name</label><input style={S.textInput} value={n} onChange={e => setN(e.target.value)} placeholder='e.g., "hers" or "Brand Y"' /></div>
+      <div style={S.obSection}><label style={S.obLabel}>Brand</label><p style={S.obHint}>Brand name or website URL.</p><input style={S.textInput} value={b} onChange={e => setB(e.target.value)} placeholder="https://www.forhers.com/" /></div>
+      <div style={S.obSection}><label style={S.obLabel}>Target Audience</label><textarea style={S.brandTextarea} value={a} onChange={e => setA(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
+      <div style={S.obSection}><label style={S.obLabel}>Tone of Voice</label><input style={S.textInput} value={t} onChange={e => setT(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
+      <div style={S.obSection}><label style={S.obLabel}>Brand Visual Style <span style={S.optionalTag}>optional</span></label><textarea style={S.brandTextarea} value={s} onChange={e => setS(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones..."' rows={2} /></div>
+      <div style={S.obSection}><label style={S.obLabel}>Competitors <span style={S.optionalTag}>optional — up to 3</span></label>{c.map((v, i) => <input key={i} style={{ ...S.textInput, marginBottom: 8 }} value={v} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
+      <button style={{ ...S.primaryBtn, marginTop: 16, width: "100%", opacity: ok ? 1 : 0.4 }} onClick={() => { if (ok) onComplete({ name: n.trim(), brand: b.trim(), audience: a.trim(), tone: t.trim(), brandStyle: s.trim(), competitors: c.filter(v => v.trim()) }); }}>{isFirst ? "Get started →" : "Create project →"}</button>
+    </div></div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   Saved View
+   ══════════════════════════════════════════ */
+function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea, onCreateFolder }) {
   const [activeFolder, setActiveFolder] = useState("all");
   const filtered = activeFolder === "all" ? savedIdeas : savedIdeas.filter(s => s.folderId === activeFolder);
   const [expandedId, setExpandedId] = useState(null);
-  const [movingId, setMovingId] = useState(null); // id of idea being moved
+  const [movingId, setMovingId] = useState(null);
+  const [showNewFolder, setShowNewFolder] = useState(false);
   return (
-    <div style={styles.savedLayout}>
-      <div style={styles.savedSidebar}>
-        <div style={{ ...styles.folderItem, ...(activeFolder === "all" ? styles.folderItemActive : {}) }} onClick={() => setActiveFolder("all")}>
-          <span>📋 All Saved</span><span style={styles.folderCount}>{savedIdeas.length}</span>
+    <>
+      {showNewFolder && <NewFolderModal onSave={(name) => { onCreateFolder(name); setShowNewFolder(false); }} onClose={() => setShowNewFolder(false)} />}
+      <div style={S.savedLayout}>
+        <div style={S.savedSidebar}>
+          <div style={{ ...S.folderItem, ...(activeFolder === "all" ? S.folderItemActive : {}) }} onClick={() => setActiveFolder("all")}>
+            <span>📋 All Saved</span><span style={S.folderCount}>{savedIdeas.length}</span>
+          </div>
+          {folders.map(f => (
+            <div key={f.id} style={{ ...S.folderItem, ...(activeFolder === f.id ? S.folderItemActive : {}) }} onClick={() => setActiveFolder(f.id)}>
+              <span>📁 {f.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={S.folderCount}>{savedIdeas.filter(s => s.folderId === f.id).length}</span>
+                <button style={S.folderDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm(`Delete folder "${f.name}" and all ideas in it?`)) onDeleteFolder(f.id); }}>✕</button>
+              </div>
+            </div>
+          ))}
+          <button style={S.newFolderBtn} onClick={() => setShowNewFolder(true)}>+ New folder</button>
         </div>
-        {folders.map(f => (
-          <div key={f.id} style={{ ...styles.folderItem, ...(activeFolder === f.id ? styles.folderItemActive : {}) }} onClick={() => setActiveFolder(f.id)}>
-            <span>📁 {f.name}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={styles.folderCount}>{savedIdeas.filter(s => s.folderId === f.id).length}</span>
-              <button style={styles.folderDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm(`Delete folder "${f.name}" and all ideas in it? This can't be undone.`)) onDeleteFolder(f.id); }} title="Delete folder">✕</button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={styles.savedContent}>
-        {filtered.length === 0 && (
-          <div style={styles.empty}><p style={styles.emptyText}>{activeFolder === "all" ? "No saved ideas yet. Generate an idea and save it!" : "This folder is empty."}</p></div>
-        )}
-        {filtered.map(saved => (
-          <div key={saved.id} style={styles.savedCard}>
-            <div style={styles.savedCardHeader} onClick={() => setExpandedId(expandedId === saved.id ? null : saved.id)}>
-              <div>
-                <div style={styles.savedMeta}>
-                  <span style={styles.savedPlatform}>{saved.platform}</span>
-                  <span style={styles.savedTopic}>{saved.topic}</span>
-                  <span style={styles.savedDate}>{new Date(saved.savedAt).toLocaleDateString()}</span>
+        <div style={S.savedContent}>
+          {filtered.length === 0 && <div style={S.empty}><p style={S.emptyText}>{activeFolder === "all" ? "No saved ideas yet. Generate an idea and save it!" : "This folder is empty."}</p></div>}
+          {filtered.map(saved => (
+            <div key={saved.id} style={S.savedCard}>
+              <div style={S.savedCardHeader} onClick={() => setExpandedId(expandedId === saved.id ? null : saved.id)}>
+                <div>
+                  <div style={S.savedMeta}><span style={S.savedPlatform}>{saved.platform}</span><span style={S.savedTopic}>{saved.topic}</span><span style={S.savedDate}>{new Date(saved.savedAt).toLocaleDateString()}</span></div>
+                  <h4 style={S.savedAngle}>{saved.idea.angle}</h4>
+                  <span style={S.savedFormat}>{saved.idea.format}</span>
                 </div>
-                <h4 style={styles.savedAngle}>{saved.idea.angle}</h4>
-                <span style={styles.savedFormat}>{saved.idea.format}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button style={S.savedMoveBtn} onClick={e => { e.stopPropagation(); setMovingId(movingId === saved.id ? null : saved.id); }}>Move</button>
+                  <button style={S.savedDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm("Delete this saved idea?")) onDeleteIdea(saved.id); }}>Delete</button>
+                  <span style={{ color: "#C4B9A8", fontSize: 14 }}>{expandedId === saved.id ? "▲" : "▼"}</span>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button style={styles.savedMoveBtn} onClick={e => { e.stopPropagation(); setMovingId(movingId === saved.id ? null : saved.id); }} title="Move to folder">Move</button>
-                <button style={styles.savedDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm("Delete this saved idea? This can't be undone.")) onDeleteIdea(saved.id); }} title="Delete">Delete</button>
-                <span style={{ color: "#C4B9A8", fontSize: 14 }}>{expandedId === saved.id ? "▲" : "▼"}</span>
-              </div>
+              {movingId === saved.id && (
+                <div style={S.moveDropdown}>
+                  {folders.filter(f => f.id !== saved.folderId).map(f => <div key={f.id} style={S.moveOption} onClick={e => { e.stopPropagation(); onMoveIdea(saved.id, f.id); setMovingId(null); }}>📁 {f.name}</div>)}
+                  {folders.filter(f => f.id !== saved.folderId).length === 0 && <div style={S.moveOptionEmpty}>No other folders</div>}
+                </div>
+              )}
+              {expandedId === saved.id && <div style={{ paddingTop: 12 }}><IdeaCard idea={saved.idea} index={0} boardKey={`saved-${saved.id}`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} /></div>}
             </div>
-            {movingId === saved.id && (
-              <div style={styles.moveDropdown}>
-                {folders.filter(f => f.id !== saved.folderId).map(f => (
-                  <div key={f.id} style={styles.moveOption} onClick={e => { e.stopPropagation(); onMoveIdea(saved.id, f.id); setMovingId(null); }}>📁 {f.name}</div>
-                ))}
-                {folders.filter(f => f.id !== saved.folderId).length === 0 && <div style={styles.moveOptionEmpty}>No other folders</div>}
-              </div>
-            )}
-            {expandedId === saved.id && (
-              <div style={{ paddingTop: 12 }}>
-                <IdeaCard idea={saved.idea} index={0} tabId={`saved-${saved.id}`} platform={saved.platform} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
-/* ── Tab Content (updated with save) ── */
-function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
+/* ══════════════════════════════════════════
+   Tab Content
+   ══════════════════════════════════════════ */
+function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
   const resultsRef = useRef(null);
-  const handleGenerate = () => {
-    if (!tab.topic.trim() || !brand.trim()) return;
-    requestGenerate(tab.id, tab.topic, tab.platform, resultsRef);
-  };
-
+  const go = () => { if (tab.topic.trim() && project.brand.trim()) requestGenerate(tab.id, tab.topic, tab.platform, resultsRef); };
   return (
     <div>
-      <div style={styles.inputCard}>
-        <div style={styles.inputGrid}>
-          <div style={styles.topicCol}><label style={styles.inputLabel}>Topic or keyword</label><input style={styles.textInput} value={tab.topic} onChange={e => updateTab(tab.id, { topic: e.target.value })} placeholder="foods for weight management" onKeyDown={e => { if (e.key === "Enter") handleGenerate(); }} /></div>
-          <div style={styles.platformCol}><label style={styles.inputLabel}>Platform</label><select style={styles.selectInput} value={tab.platform} onChange={e => updateTab(tab.id, { platform: e.target.value })}>{PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-          <div style={styles.btnCol}><button style={{ ...styles.generateBtn, opacity: tab.topic.trim() && !tab.loading ? 1 : 0.4, cursor: tab.topic.trim() && !tab.loading ? "pointer" : "not-allowed" }} onClick={handleGenerate} disabled={!tab.topic.trim() || tab.loading}>{tab.loading ? "Packing..." : "Pack my bento 🍱"}</button></div>
+      <div style={S.inputCard}>
+        <div style={S.inputGrid}>
+          <div style={S.topicCol}><label style={S.inputLabel}>Topic or keyword</label><input style={S.textInput} value={tab.topic} onChange={e => updateTab(tab.id, { topic: e.target.value })} placeholder="foods for weight management" onKeyDown={e => { if (e.key === "Enter") go(); }} /></div>
+          <div style={S.platformCol}><label style={S.inputLabel}>Platform</label><select style={S.selectInput} value={tab.platform} onChange={e => updateTab(tab.id, { platform: e.target.value })}>{PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+          <div style={S.btnCol}><button style={{ ...S.generateBtn, opacity: tab.topic.trim() && !tab.loading ? 1 : 0.4 }} onClick={go} disabled={!tab.topic.trim() || tab.loading}>{tab.loading ? "Packing..." : "Pack my bento 🍱"}</button></div>
         </div>
-        {competitors.length > 0 && <div style={styles.activeComps}><span style={styles.activeCompsLabel}>Analyzing:</span>{competitors.map((c, i) => <span key={i} style={styles.compChip}>{c}</span>)}</div>}
+        {(project.competitors || []).length > 0 && <div style={S.activeComps}><span style={S.activeCompsLabel}>Analyzing:</span>{project.competitors.map((c, i) => <span key={i} style={S.compChip}>{c}</span>)}</div>}
       </div>
-
-      {tab.queued && (
-        <div style={styles.queuedWrap}><p style={styles.queuedText}>⏳ Waiting for other tab to finish generating...</p><p style={styles.queuedSub}>Your request is queued and will start automatically.</p></div>
-      )}
+      {tab.queued && <div style={S.queuedWrap}><p style={S.queuedText}>⏳ Waiting for other tab to finish...</p><p style={S.queuedSub}>Your request is queued and will start automatically.</p></div>}
       {tab.loading && !tab.queued && <LoadingState />}
-      {tab.error && <div style={styles.errorBox}>{tab.error}</div>}
-
+      {tab.error && <div style={S.errorBox}>{tab.error}</div>}
       {tab.idea && (
-        <div ref={resultsRef} style={styles.results}>
-          <div style={styles.resultsHeader}>
-            <p style={styles.resultsLabel}>Idea for <span style={styles.topicHighlight}>"{tab.topic}"</span> on <span style={styles.topicHighlight}>{tab.platform}</span>{competitors.length > 0 && <span style={{ color: "#A39888" }}> · informed by {competitors.join(", ")}</span>}</p>
-            <button style={styles.regenerateBtn} onClick={handleGenerate} disabled={tab.loading}>↻ Regenerate idea</button>
+        <div ref={resultsRef} style={S.results}>
+          <div style={S.resultsHeader}>
+            <p style={S.resultsLabel}>Idea for <span style={S.topicHighlight}>"{tab.topic}"</span> on <span style={S.topicHighlight}>{tab.platform}</span></p>
+            <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate idea</button>
           </div>
-          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} platform={tab.platform} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
+          <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
           <UsageCounter usage={tab.usage} />
         </div>
       )}
-
-      {!tab.loading && !tab.idea && !tab.error && (
-        <div style={styles.empty}><div style={styles.emptyBento}><div style={{ ...styles.emptyCell, opacity: 0.15 }} /><div style={{ ...styles.emptyCell, opacity: 0.1 }} /><div style={{ ...styles.emptyCell, opacity: 0.08 }} /><div style={{ ...styles.emptyCell, opacity: 0.05 }} /></div><p style={styles.emptyText}>Your bento is empty. Enter a topic to start packing.</p></div>
-      )}
+      {!tab.loading && !tab.idea && !tab.error && <div style={S.empty}><div style={S.emptyBento}><div style={{ ...S.emptyCell, opacity: 0.15 }} /><div style={{ ...S.emptyCell, opacity: 0.1 }} /><div style={{ ...S.emptyCell, opacity: 0.08 }} /><div style={{ ...S.emptyCell, opacity: 0.05 }} /></div><p style={S.emptyText}>Your bento is empty. Enter a topic to start packing.</p></div>}
     </div>
   );
 }
 
-/* ── localStorage helpers ── */
-const STORAGE_KEYS = {
-  settings: "bento_settings",
-  tabs: "bento_tabs",
-  moodBoards: "bento_moodboards",
-  tabCounter: "bento_tab_counter",
-  savedIdeas: "bento_saved_ideas",
-  folders: "bento_folders",
-};
-
-function saveToStorage(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("Storage save failed:", e); }
-}
-
-function loadFromStorage(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
-}
-
-/* ── Main ── */
+/* ══════════════════════════════════════════
+   Main App
+   ══════════════════════════════════════════ */
 let tabCounter = 1;
-function createTab() {
-  return { id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", idea: null, usage: null, loading: false, queued: false, error: null };
-}
+const newTab = () => ({ id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", idea: null, usage: null, loading: false, queued: false, error: null });
 
 export default function Bento() {
-  const [brand, setBrand] = useState(""); const [audience, setAudience] = useState(""); const [tone, setTone] = useState(""); const [brandStyle, setBrandStyle] = useState("");
-  const [competitors, setCompetitors] = useState([]); const [showSettings, setShowSettings] = useState(false);
-  const [onboarded, setOnboarded] = useState(false); const [moodBoards, setMoodBoards] = useState({});
-  const [tabs, setTabs] = useState([createTab()]);
-  const [activeTabId, setActiveTabId] = useState(tabs[0].id);
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [projectData, setProjectData] = useState({}); // { [projId]: { tabs, savedIdeas, folders, moodBoards } }
+  const [view, setView] = useState("generate");
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(null);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [view, setView] = useState("generate"); // "generate" or "saved"
-  const [savedIdeas, setSavedIdeas] = useState([]);
-  const [folders, setFolders] = useState([]);
-  const [showSaveModal, setShowSaveModal] = useState(null); // null or tab object
   const isGeneratingRef = useRef(false);
   const queueRef = useRef([]);
 
-  // Load from localStorage on mount
+  const proj = projects.find(p => p.id === activeProjectId);
+  const data = projectData[activeProjectId] || { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} };
+
+  // Helpers to update project data
+  const setData = (updates) => {
+    setProjectData(prev => ({ ...prev, [activeProjectId]: { ...data, ...updates } }));
+  };
+  const updateTab = (id, updates) => { setData({ tabs: data.tabs.map(t => t.id === id ? { ...t, ...updates } : t) }); };
+
+  // ── Load ──
   useEffect(() => {
-    const settings = loadFromStorage(STORAGE_KEYS.settings, null);
-    if (settings && settings.brand && settings.audience && settings.tone) {
-      setBrand(settings.brand); setAudience(settings.audience);
-      setTone(settings.tone); setBrandStyle(settings.brandStyle || "");
-      setCompetitors(settings.competitors || []); setOnboarded(true);
+    const ps = load("bento_projects", []);
+    const apId = load("bento_active_project", null);
+    const pd = {};
+    for (const p of ps) {
+      pd[p.id] = load(`bento_data_${p.id}`, { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} });
+      // Clear loading states
+      if (pd[p.id].tabs) pd[p.id].tabs = pd[p.id].tabs.map(t => ({ ...t, loading: false, queued: false, error: null }));
+      // Restore tab counter
+      const maxId = Math.max(0, ...(pd[p.id].tabs || []).map(t => parseInt(t.id.replace("tab-", "")) || 0));
+      tabCounter = Math.max(tabCounter, maxId + 1);
     }
-    const savedTabs = loadFromStorage(STORAGE_KEYS.tabs, null);
-    if (savedTabs && savedTabs.tabs && savedTabs.tabs.length > 0) {
-      const restored = savedTabs.tabs.map(t => ({ ...t, loading: false, queued: false, error: null }));
-      setTabs(restored);
-      setActiveTabId(savedTabs.activeTabId || restored[0].id);
-      const maxId = Math.max(...restored.map(t => parseInt(t.id.replace("tab-", "")) || 0));
-      tabCounter = maxId + 1;
-    }
-    const savedCounter = loadFromStorage(STORAGE_KEYS.tabCounter, null);
-    if (savedCounter) tabCounter = Math.max(tabCounter, savedCounter);
-    const savedMoodBoards = loadFromStorage(STORAGE_KEYS.moodBoards, {});
-    setMoodBoards(savedMoodBoards);
-    const si = loadFromStorage(STORAGE_KEYS.savedIdeas, []);
-    setSavedIdeas(si);
-    const sf = loadFromStorage(STORAGE_KEYS.folders, []);
-    setFolders(sf);
+    setProjects(ps);
+    setProjectData(pd);
+    if (apId && ps.find(p => p.id === apId)) setActiveProjectId(apId);
     setHydrated(true);
   }, []);
 
-  // Save settings whenever they change — only if onboarded (has real data)
+  // ── Save ──
   useEffect(() => {
-    if (!hydrated || !onboarded) return;
-    if (!brand.trim() || !audience.trim() || !tone.trim()) return;
-    saveToStorage(STORAGE_KEYS.settings, { brand, audience, tone, brandStyle, competitors });
-  }, [brand, audience, tone, brandStyle, competitors, hydrated, onboarded]);
+    if (!hydrated || projects.length === 0) return;
+    save("bento_projects", projects);
+    save("bento_active_project", activeProjectId);
+  }, [projects, activeProjectId, hydrated]);
 
-  // Save tabs whenever they change — only if onboarded
   useEffect(() => {
-    if (!hydrated || !onboarded) return;
-    // Only save tabs that aren't mid-loading, strip transient state
-    const toSave = tabs.map(t => ({ id: t.id, name: t.name, topic: t.topic, platform: t.platform, idea: t.idea, usage: t.usage }));
-    saveToStorage(STORAGE_KEYS.tabs, { tabs: toSave, activeTabId });
-    saveToStorage(STORAGE_KEYS.tabCounter, tabCounter);
-  }, [tabs, activeTabId, hydrated]);
+    if (!hydrated || !activeProjectId) return;
+    save(`bento_data_${activeProjectId}`, {
+      tabs: data.tabs.map(t => ({ id: t.id, name: t.name, topic: t.topic, platform: t.platform, idea: t.idea, usage: t.usage })),
+      savedIdeas: data.savedIdeas, folders: data.folders, moodBoards: data.moodBoards,
+    });
+  }, [projectData, activeProjectId, hydrated]);
 
-  // Save mood boards whenever they change
-  useEffect(() => {
-    if (!hydrated || !onboarded) return;
-    saveToStorage(STORAGE_KEYS.moodBoards, moodBoards);
-  }, [moodBoards, hydrated]);
-
-  // Save savedIdeas whenever they change
-  useEffect(() => {
-    if (!hydrated || !onboarded) return;
-    saveToStorage(STORAGE_KEYS.savedIdeas, savedIdeas);
-  }, [savedIdeas, hydrated]);
-
-  // Save folders whenever they change
-  useEffect(() => {
-    if (!hydrated || !onboarded) return;
-    saveToStorage(STORAGE_KEYS.folders, folders);
-  }, [folders, hydrated]);
-
-  const updateTab = (id, updates) => { setTabs(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t)); };
-  const addTab = () => { const nt = createTab(); setTabs(prev => [...prev, nt]); setActiveTabId(nt.id); };
-  const closeTab = (id) => { if (tabs.length === 1) return; const idx = tabs.findIndex(t => t.id === id); const nt = tabs.filter(t => t.id !== id); setTabs(nt); if (activeTabId === id) setActiveTabId(nt[Math.max(0, idx - 1)].id); };
-
-  // Save idea flow
-  const onSaveIdea = (tab) => { setShowSaveModal(tab); };
-  const handleSaveToFolder = (folderId, newFolderName) => {
-    let targetFolderId = folderId;
-    if (newFolderName) {
-      targetFolderId = `folder-${Date.now()}`;
-      setFolders(prev => [...prev, { id: targetFolderId, name: newFolderName }]);
-    }
-    const tab = showSaveModal;
-    if (!tab || !tab.idea) return;
-    const saved = { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: targetFolderId, savedAt: Date.now() };
-    setSavedIdeas(prev => [...prev, saved]);
-    setShowSaveModal(null);
-  };
-  const isIdeaSaved = (tab) => {
-    if (!tab.idea) return false;
-    return savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic);
-  };
-  const deleteIdea = (id) => { setSavedIdeas(prev => prev.filter(s => s.id !== id)); };
-  const deleteFolder = (id) => {
-    setFolders(prev => prev.filter(f => f.id !== id));
-    setSavedIdeas(prev => prev.filter(s => s.folderId !== id));
-  };
-  const moveIdea = (ideaId, newFolderId) => {
-    setSavedIdeas(prev => prev.map(s => s.id === ideaId ? { ...s, folderId: newFolderId } : s));
+  // ── Project actions ──
+  const createProject = (info) => {
+    const id = `proj-${Date.now()}`;
+    const p = { id, ...info };
+    setProjects(prev => [...prev, p]);
+    setProjectData(prev => ({ ...prev, [id]: { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} } }));
+    setActiveProjectId(id);
+    setCreatingProject(false);
+    setView("generate");
   };
 
+  const updateProject = (updated) => {
+    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
+  const deleteProject = (id) => {
+    if (projects.length <= 1) return;
+    if (!window.confirm("Delete this project and all its data?")) return;
+    setProjects(prev => prev.filter(p => p.id !== id));
+    setProjectData(prev => { const n = { ...prev }; delete n[id]; return n; });
+    localStorage.removeItem(`bento_data_${id}`);
+    if (activeProjectId === id) setActiveProjectId(projects.find(p => p.id !== id)?.id);
+  };
+
+  // ── Tab actions ──
+  const addTab = () => { const t = newTab(); setData({ tabs: [...data.tabs, t] }); setActiveTabId(t.id); };
+  const closeTab = (id) => { if (data.tabs.length === 1) return; const idx = data.tabs.findIndex(t => t.id === id); const nt = data.tabs.filter(t => t.id !== id); setData({ tabs: nt }); if (activeTabId === id) setActiveTabId(nt[Math.max(0, idx - 1)].id); };
+
+  // ── Generation ──
   const runGenerate = async (tabId, topic, platform, resultsRef) => {
+    if (!proj) return;
     isGeneratingRef.current = true;
-    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null, usage: null } : t));
+    setData({ tabs: data.tabs.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null, usage: null } : t) });
     try {
       const response = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, platform, brand, audience, tone, brandStyle, competitors }),
+        body: JSON.stringify({ topic, platform, brand: proj.brand, audience: proj.audience, tone: proj.tone, brandStyle: proj.brandStyle, competitors: proj.competitors }),
       });
       if (!response.ok) throw new Error("API request failed");
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, idea: data.idea, usage: data.usage, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t));
+      const r = await response.json();
+      if (r.error) throw new Error(r.error);
+      setProjectData(prev => {
+        const d = prev[activeProjectId] || data;
+        return { ...prev, [activeProjectId]: { ...d, tabs: d.tabs.map(t => t.id === tabId ? { ...t, idea: r.idea, usage: r.usage, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t) } };
+      });
       setTimeout(() => { resultsRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
-    } catch (err) { console.error(err); setTabs(prev => prev.map(t => t.id === tabId ? { ...t, error: "Something went wrong. Please try again.", loading: false } : t)); }
-    finally { isGeneratingRef.current = false; if (queueRef.current.length > 0) { const next = queueRef.current.shift(); runGenerate(next.tabId, next.topic, next.platform, next.resultsRef); } }
+    } catch (err) {
+      console.error(err);
+      setProjectData(prev => {
+        const d = prev[activeProjectId] || data;
+        return { ...prev, [activeProjectId]: { ...d, tabs: d.tabs.map(t => t.id === tabId ? { ...t, error: "Something went wrong. Please try again.", loading: false } : t) } };
+      });
+    } finally {
+      isGeneratingRef.current = false;
+      if (queueRef.current.length > 0) { const next = queueRef.current.shift(); runGenerate(next.tabId, next.topic, next.platform, next.resultsRef); }
+    }
   };
 
   const requestGenerate = (tabId, topic, platform, resultsRef) => {
     if (isGeneratingRef.current) {
       queueRef.current = queueRef.current.filter(q => q.tabId !== tabId);
       queueRef.current.push({ tabId, topic, platform, resultsRef });
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null, usage: null } : t));
+      setData({ tabs: data.tabs.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null, usage: null } : t) });
     } else { runGenerate(tabId, topic, platform, resultsRef); }
   };
 
-  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+  // ── Save idea ──
+  const onSaveIdea = (tab) => { setShowSaveModal(tab); };
+  const handleSaveToFolder = (folderId, newName) => {
+    let fid = folderId;
+    if (newName) { fid = `folder-${Date.now()}`; setData({ folders: [...data.folders, { id: fid, name: newName }] }); }
+    const tab = showSaveModal;
+    if (!tab?.idea) return;
+    setData({ savedIdeas: [...data.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] });
+    setShowSaveModal(null);
+  };
+  const isIdeaSaved = (tab) => tab.idea ? data.savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic) : false;
+  const deleteIdea = (id) => { setData({ savedIdeas: data.savedIdeas.filter(s => s.id !== id) }); };
+  const deleteFolder = (id) => { setData({ folders: data.folders.filter(f => f.id !== id), savedIdeas: data.savedIdeas.filter(s => s.folderId !== id) }); };
+  const moveIdea = (ideaId, fid) => { setData({ savedIdeas: data.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) }); };
+  const createFolder = (name) => { setData({ folders: [...data.folders, { id: `folder-${Date.now()}`, name }] }); };
 
-  // Wait for localStorage to load before rendering
-  if (!hydrated) {
-    return (<div style={{ ...styles.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <div style={styles.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...styles.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div>
-    </div>);
-  }
+  const setMoodBoards = (mb) => { setData({ moodBoards: mb }); };
 
-  if (!onboarded) {
-    return (<div style={styles.app}><Onboarding onComplete={(b, a, t, s, c) => { setBrand(b); setAudience(a); setTone(t); setBrandStyle(s); setCompetitors(c); setOnboarded(true); }} /></div>);
-  }
+  const [activeTabId, setActiveTabId] = useState(null);
+  const currentTab = data.tabs.find(t => t.id === activeTabId) || data.tabs[0];
+
+  // ── Render ──
+  if (!hydrated) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}><div style={S.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...S.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div></div>;
+
+  if (projects.length === 0 || creatingProject) return <div style={S.app}><ProjectSetup isFirst={projects.length === 0} onComplete={createProject} /></div>;
+
+  if (!proj) return null;
 
   return (
-    <div style={styles.app}>
-      {showSettings && <SettingsModal brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} onSave={(b, a, t, s, c) => { setBrand(b); setAudience(a); setTone(t); setBrandStyle(s); setCompetitors(c); }} onClose={() => setShowSettings(false)} />}
-      {showSaveModal && <SaveToFolderModal folders={folders.map(f => ({ ...f, count: savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
-      <header style={styles.header}>
-        <div style={{ ...styles.headerLeft, cursor: "pointer" }} onClick={() => setView("generate")}><div style={styles.headerBento}><div style={{ ...styles.hbCell, background: "#D4857A" }} /><div style={{ ...styles.hbCell, background: "#9B72AA" }} /><div style={{ ...styles.hbCell, background: "#6B937A" }} /><div style={{ ...styles.hbCell, background: "#E8C869" }} /></div><span style={styles.headerName}>Bento</span></div>
-        <div style={styles.headerRight}>
-          <button style={{ ...styles.viewToggle, ...(view === "generate" ? styles.viewToggleActive : {}) }} onClick={() => setView("generate")}>Generate</button>
-          <button style={{ ...styles.viewToggle, ...(view === "saved" ? styles.viewToggleActive : {}) }} onClick={() => setView("saved")}>Saved{savedIdeas.length > 0 ? ` (${savedIdeas.length})` : ""}</button>
-          <button style={styles.settingsBtn} onClick={() => setShowSettings(true)}>⚙</button>
+    <div style={S.app}>
+      {showSettings && <SettingsModal project={proj} onSave={updateProject} onClose={() => setShowSettings(false)} />}
+      {showSaveModal && <SaveToFolderModal folders={data.folders.map(f => ({ ...f, count: data.savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
+
+      <header style={S.header}>
+        <div style={{ ...S.headerLeft, cursor: "pointer" }} onClick={() => { setView("generate"); setShowProjectMenu(false); }}>
+          <div style={S.headerBento}><div style={{ ...S.hbCell, background: "#D4857A" }} /><div style={{ ...S.hbCell, background: "#9B72AA" }} /><div style={{ ...S.hbCell, background: "#6B937A" }} /><div style={{ ...S.hbCell, background: "#E8C869" }} /></div>
+          <span style={S.headerName}>Bento</span>
+        </div>
+        <div style={S.headerRight}>
+          {/* Project switcher */}
+          <div style={{ position: "relative" }}>
+            <button style={S.projectBtn} onClick={() => setShowProjectMenu(!showProjectMenu)}>
+              {proj.name} ▾
+            </button>
+            {showProjectMenu && (
+              <div style={S.projectMenu}>
+                {projects.map(p => (
+                  <div key={p.id} style={{ ...S.projectMenuItem, ...(p.id === activeProjectId ? S.projectMenuItemActive : {}) }} onClick={() => { setActiveProjectId(p.id); setShowProjectMenu(false); setView("generate"); }}>
+                    <span>{p.name}</span>
+                    {projects.length > 1 && p.id !== activeProjectId && <button style={S.folderDeleteBtn} onClick={e => { e.stopPropagation(); deleteProject(p.id); }}>✕</button>}
+                  </div>
+                ))}
+                <div style={S.projectMenuDivider} />
+                <div style={S.projectMenuItem} onClick={() => { setCreatingProject(true); setShowProjectMenu(false); }}>+ New project</div>
+              </div>
+            )}
+          </div>
+          <button style={{ ...S.viewToggle, ...(view === "generate" ? S.viewToggleActive : {}) }} onClick={() => setView("generate")}>Generate</button>
+          <button style={{ ...S.viewToggle, ...(view === "saved" ? S.viewToggleActive : {}) }} onClick={() => setView("saved")}>Saved{data.savedIdeas.length > 0 ? ` (${data.savedIdeas.length})` : ""}</button>
+          <button style={S.settingsBtn} onClick={() => setShowSettings(true)}>⚙</button>
         </div>
       </header>
 
       {view === "generate" && (
         <>
-          <div style={styles.tabBar}>
-            <div style={styles.tabList}>
-              {tabs.map(tab => (
-                <div key={tab.id} style={{ ...styles.tab, ...(tab.id === activeTabId ? styles.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
-                  <span style={styles.tabName}>
-                    {tab.loading && !tab.queued && <span style={styles.tabSpinner}>⟳</span>}
-                    {tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}
-                    {tab.name}
-                  </span>
-                  {tabs.length > 1 && <button style={styles.tabClose} onClick={e => { e.stopPropagation(); closeTab(tab.id); }}>✕</button>}
-                </div>
-              ))}
-              <button style={styles.tabAdd} onClick={addTab}>+ New</button>
-            </div>
-          </div>
-          <main style={styles.main}>
-            <TabContent key={activeTab.id} tab={activeTab} brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} moodBoards={moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} onSaveIdea={onSaveIdea} isIdeaSaved={isIdeaSaved} />
+          <div style={S.tabBar}><div style={S.tabList}>
+            {data.tabs.map(tab => (
+              <div key={tab.id} style={{ ...S.tab, ...(tab.id === (activeTabId || data.tabs[0]?.id) ? S.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
+                <span style={S.tabName}>{tab.loading && !tab.queued && <span style={S.tabSpinner}>⟳</span>}{tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}{tab.name}</span>
+                {data.tabs.length > 1 && <button style={S.tabClose} onClick={e => { e.stopPropagation(); closeTab(tab.id); }}>✕</button>}
+              </div>
+            ))}
+            <button style={S.tabAdd} onClick={addTab}>+ New</button>
+          </div></div>
+          <main style={S.main}>
+            <TabContent key={currentTab.id} tab={currentTab} project={proj} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} onSaveIdea={onSaveIdea} isIdeaSaved={isIdeaSaved} />
           </main>
         </>
       )}
 
       {view === "saved" && (
-        <main style={styles.main}>
-          <SavedView savedIdeas={savedIdeas} folders={folders} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} />
+        <main style={S.main}>
+          <SavedView savedIdeas={data.savedIdeas} folders={data.folders} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} onCreateFolder={createFolder} />
         </main>
       )}
     </div>
   );
 }
 
-/* ── Styles ── */
-const styles = {
+/* ══════════════════════════════════════════
+   Styles
+   ══════════════════════════════════════════ */
+const S = {
   app: { fontFamily: "'Instrument Sans', 'Helvetica Neue', sans-serif", minHeight: "100vh", background: "#FAF8F5", color: "#1C1917" },
   onboarding: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 },
   onboardingCard: { maxWidth: 560, width: "100%", textAlign: "left", padding: "44px 40px", background: "#FFF", borderRadius: 20, border: "1px solid #E8E2D9", boxShadow: "0 8px 40px rgba(0,0,0,0.04)" },
@@ -668,12 +523,15 @@ const styles = {
   headerLeft: { display: "flex", alignItems: "center", gap: 10 },
   headerBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, width: 22, height: 22, borderRadius: 4, overflow: "hidden" },
   hbCell: { borderRadius: 2 }, headerName: { fontSize: 18, fontWeight: 800, letterSpacing: "-0.03em" },
-  settingsBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", cursor: "pointer", fontFamily: "inherit" },
   headerRight: { display: "flex", alignItems: "center", gap: 6 },
+  settingsBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", cursor: "pointer", fontFamily: "inherit" },
+  projectBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, color: "#1C1917", cursor: "pointer", fontFamily: "inherit" },
+  projectMenu: { position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.1)", minWidth: 200, zIndex: 50, overflow: "hidden" },
+  projectMenuItem: { padding: "10px 16px", fontSize: 13, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#44403C" },
+  projectMenuItemActive: { background: "#FFF4F2", fontWeight: 700, color: "#1C1917" },
+  projectMenuDivider: { height: 1, background: "#EDE8DF" },
   viewToggle: { background: "none", border: "1px solid transparent", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#A39888", cursor: "pointer", fontFamily: "inherit" },
   viewToggleActive: { color: "#1C1917", background: "#FAF8F5", border: "1px solid #DDD5CA" },
-  saveBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  savedBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#6B937A", background: "#F1F7F3", border: "1.5px solid #E1EDE5", borderRadius: 8, cursor: "default", fontFamily: "inherit", whiteSpace: "nowrap" },
   tabBar: { borderBottom: "1px solid #E8E2D9", background: "#FFFEFB", padding: "0 32px", position: "sticky", top: 53, zIndex: 19 },
   tabList: { display: "flex", alignItems: "center", gap: 2, overflowX: "auto" },
   tab: { display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontSize: 13, fontWeight: 500, color: "#A39888", cursor: "pointer", borderBottom: "2px solid transparent", whiteSpace: "nowrap", fontFamily: "inherit" },
@@ -687,7 +545,7 @@ const styles = {
   inputGrid: { display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" },
   topicCol: { flex: 2.5, minWidth: 200 }, platformCol: { flex: 0.8, minWidth: 130 }, btnCol: { flex: 1, minWidth: 150 },
   inputLabel: { display: "block", fontSize: 11, fontWeight: 700, color: "#A39888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 },
-  optionalTag: { fontSize: 9, fontWeight: 500, color: "#C4B9A8", textTransform: "lowercase", letterSpacing: "0.02em", fontStyle: "italic" },
+  optionalTag: { fontSize: 9, fontWeight: 500, color: "#C4B9A8", textTransform: "lowercase", fontStyle: "italic" },
   textInput: { width: "100%", padding: "11px 14px", fontSize: 14, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box" },
   selectInput: { width: "100%", padding: "11px 14px", fontSize: 14, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box", appearance: "none", cursor: "pointer" },
   generateBtn: { width: "100%", padding: "11px 20px", fontSize: 14, fontWeight: 700, color: "#FFF", background: "#C07A8E", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", boxSizing: "border-box" },
@@ -751,73 +609,14 @@ const styles = {
   moodNote: { fontSize: 12, color: "#78716C", fontStyle: "italic", display: "block", marginTop: 4 },
   moodInput: { display: "flex", gap: 8, alignItems: "center" },
   moodAddBtn: { padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#78716C", background: "#FAF8F5", border: "1.5px solid #DDD5CA", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  bentoBottom: { padding: "18px 28px", borderTop: "1px solid #E8E2D9", background: "#FDFCFA" },
+  whyLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A39888", display: "block", marginBottom: 6 },
+  whyText: { fontSize: 13, lineHeight: 1.6, color: "#57534E", margin: 0 },
   usageBar: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "12px 0 0", opacity: 0.5 },
   usageItem: { fontSize: 11, color: "#A39888", fontFamily: "monospace" },
   usageDot: { fontSize: 11, color: "#DDD5CA" },
-  bentoBottom: { padding: "18px 28px", borderTop: "1px solid #E8E2D9", background: "#FDFCFA" },
-
-  // Social Preview - shared
-  previewSection: { padding: "22px 24px", borderTop: "1px solid #E8E2D9", background: "#F9F8F6" },
-
-  // Carousel
-  carouselScroll: { display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 },
-  igSlide: { minWidth: 220, maxWidth: 220, background: "#FFF", borderRadius: 12, padding: "20px 18px", border: "1px solid #E8E2D9", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 },
-  igSlideNum: { fontSize: 10, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" },
-  igSlideHeadline: { fontSize: 14, fontWeight: 800, color: "#1C1917", lineHeight: 1.3, margin: 0 },
-  igSlideBody: { fontSize: 12, color: "#44403C", lineHeight: 1.5, margin: 0 },
-  igSlideVisual: { fontSize: 11, color: "#A39888", fontStyle: "italic", marginTop: "auto" },
-
-  // Reel / TikTok
-  reelFrame: { width: 260, background: "#0F0F0F", borderRadius: 20, padding: "24px 16px", display: "flex", position: "relative", minHeight: 420 },
-  reelContent: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 12 },
-  reelScene: { padding: "8px 0" },
-  reelTiming: { fontSize: 10, color: "#C07A8E", fontWeight: 700, marginBottom: 4 },
-  reelText: { fontSize: 15, fontWeight: 800, color: "#FFF", lineHeight: 1.3, margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.5)" },
-  reelVo: { fontSize: 11, color: "rgba(255,255,255,0.6)", fontStyle: "italic", margin: "4px 0 0" },
-  reelSidebar: { position: "absolute", right: 12, bottom: 80, display: "flex", flexDirection: "column", gap: 18, alignItems: "center" },
-  reelIcon: { fontSize: 20, opacity: 0.8 },
-
-  // LinkedIn
-  liPost: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", maxWidth: 500, overflow: "hidden" },
-  liHeader: { display: "flex", alignItems: "center", gap: 10, padding: "14px 16px" },
-  liAvatar: { width: 40, height: 40, borderRadius: "50%", background: "#E8E2D9" },
-  liName: { fontSize: 13, fontWeight: 700, color: "#1C1917" },
-  liMeta: { fontSize: 11, color: "#A39888" },
-  liBody: { padding: "0 16px 14px" },
-  liHook: { fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.4 },
-  liText: { fontSize: 13, color: "#44403C", lineHeight: 1.55, margin: "0 0 8px" },
-  liCta: { fontSize: 13, color: "#C07A8E", fontWeight: 600, margin: 0 },
-  liActions: { display: "flex", justifyContent: "space-around", padding: "10px 16px", borderTop: "1px solid #EDE8DF", fontSize: 12, color: "#78716C" },
-
-  // Twitter
-  tweetThread: { display: "flex", flexDirection: "column", gap: 0, maxWidth: 480, borderRadius: 12, overflow: "hidden", border: "1px solid #E8E2D9" },
-  tweetCard: { background: "#FFF", padding: "14px 16px", borderBottom: "1px solid #EDE8DF", position: "relative" },
-  tweetHeader: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
-  tweetAvatar: { width: 32, height: 32, borderRadius: "50%", background: "#E8E2D9" },
-  tweetName: { fontSize: 13, fontWeight: 700, color: "#1C1917", marginRight: 4 },
-  tweetHandle: { fontSize: 12, color: "#A39888" },
-  tweetBody: { fontSize: 14, color: "#1C1917", lineHeight: 1.45, margin: 0 },
-  tweetThreadLine: { position: "absolute", left: 31, bottom: -1, width: 2, height: 16, background: "#DDD5CA" },
-
-  // Blog
-  blogPreview: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", padding: "28px 32px", maxWidth: 560 },
-  blogTitle: { fontSize: 22, fontWeight: 800, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.25 },
-  blogMeta: { fontSize: 12, color: "#A39888", marginBottom: 20 },
-  blogSection: { marginBottom: 16 },
-  blogH2: { fontSize: 15, fontWeight: 700, color: "#1C1917", margin: "0 0 4px" },
-  blogBody: { fontSize: 13, color: "#44403C", lineHeight: 1.55, margin: 0 },
-
-  // IG Single / Infographic
-  igSingle: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", maxWidth: 340, overflow: "hidden" },
-  igSingleHeader: { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" },
-  igSingleAvatar: { width: 28, height: 28, borderRadius: "50%", background: "#E8E2D9" },
-  igSingleName: { fontSize: 12, fontWeight: 700, color: "#1C1917" },
-  igSingleImage: { background: "#FAF8F5", padding: "32px 24px", minHeight: 260, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" },
-  igSingleHeadline: { fontSize: 18, fontWeight: 800, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.3 },
-  igSingleBody: { fontSize: 13, color: "#44403C", lineHeight: 1.5, margin: 0 },
-  igSingleActions: { display: "flex", gap: 14, padding: "10px 14px", fontSize: 18 },
-  whyLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A39888", display: "block", marginBottom: 6 },
-  whyText: { fontSize: 13, lineHeight: 1.6, color: "#57534E", margin: 0 },
+  saveBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  savedBtnDone: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#6B937A", background: "#F1F7F3", border: "1.5px solid #E1EDE5", borderRadius: 8, cursor: "default", fontFamily: "inherit", whiteSpace: "nowrap" },
   empty: { display: "flex", flexDirection: "column", alignItems: "center", padding: "100px 20px" },
   emptyBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, width: 64, height: 64, marginBottom: 20 },
   emptyCell: { background: "#1C1917", borderRadius: 6 }, emptyText: { fontSize: 14, color: "#A39888" },
@@ -831,18 +630,15 @@ const styles = {
   brandTextarea: { width: "100%", padding: "13px 14px", fontSize: 13, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 },
   primaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 700, color: "#FFF", background: "#C07A8E", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
   secondaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: "#78716C", background: "#FAF8F5", border: "1.5px solid #DDD5CA", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
-
-  // Folder modal
-  folderOption: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, border: "1.5px solid #EDE8DF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" },
+  folderOption: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, border: "1.5px solid #EDE8DF", cursor: "pointer", fontSize: 13 },
   folderOptionActive: { borderColor: "#C07A8E", background: "#FFF4F2" },
   folderCount: { fontSize: 11, color: "#A39888", fontWeight: 600 },
-
-  // Saved view
   savedLayout: { display: "grid", gridTemplateColumns: "240px 1fr", gap: 24, minHeight: 400 },
   savedSidebar: { display: "flex", flexDirection: "column", gap: 4 },
   folderItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, color: "#78716C" },
   folderItemActive: { background: "#FFF4F2", color: "#1C1917", fontWeight: 700 },
   folderDeleteBtn: { background: "none", border: "none", color: "#C4B9A8", fontSize: 10, cursor: "pointer", padding: 2, opacity: 0.5 },
+  newFolderBtn: { padding: "10px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "none", border: "1.5px dashed #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginTop: 4 },
   savedContent: { display: "flex", flexDirection: "column", gap: 12 },
   savedCard: { background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 14, padding: "16px 20px", cursor: "pointer" },
   savedCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },

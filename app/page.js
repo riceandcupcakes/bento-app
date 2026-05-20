@@ -237,18 +237,16 @@ export default function Bento() {
   // Load from localStorage on mount
   useEffect(() => {
     const settings = loadFromStorage(STORAGE_KEYS.settings, null);
-    if (settings) {
-      setBrand(settings.brand || ""); setAudience(settings.audience || "");
-      setTone(settings.tone || ""); setBrandStyle(settings.brandStyle || "");
+    if (settings && settings.brand && settings.audience && settings.tone) {
+      setBrand(settings.brand); setAudience(settings.audience);
+      setTone(settings.tone); setBrandStyle(settings.brandStyle || "");
       setCompetitors(settings.competitors || []); setOnboarded(true);
     }
     const savedTabs = loadFromStorage(STORAGE_KEYS.tabs, null);
     if (savedTabs && savedTabs.tabs && savedTabs.tabs.length > 0) {
-      // Restore tabs but clear loading/queued states
       const restored = savedTabs.tabs.map(t => ({ ...t, loading: false, queued: false, error: null }));
       setTabs(restored);
       setActiveTabId(savedTabs.activeTabId || restored[0].id);
-      // Restore tab counter to avoid ID collisions
       const maxId = Math.max(...restored.map(t => parseInt(t.id.replace("tab-", "")) || 0));
       tabCounter = maxId + 1;
     }
@@ -259,15 +257,16 @@ export default function Bento() {
     setHydrated(true);
   }, []);
 
-  // Save settings whenever they change
+  // Save settings whenever they change — only if onboarded (has real data)
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !onboarded) return;
+    if (!brand.trim() || !audience.trim() || !tone.trim()) return;
     saveToStorage(STORAGE_KEYS.settings, { brand, audience, tone, brandStyle, competitors });
-  }, [brand, audience, tone, brandStyle, competitors, hydrated]);
+  }, [brand, audience, tone, brandStyle, competitors, hydrated, onboarded]);
 
-  // Save tabs whenever they change
+  // Save tabs whenever they change — only if onboarded
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !onboarded) return;
     // Only save tabs that aren't mid-loading, strip transient state
     const toSave = tabs.map(t => ({ id: t.id, name: t.name, topic: t.topic, platform: t.platform, idea: t.idea, usage: t.usage }));
     saveToStorage(STORAGE_KEYS.tabs, { tabs: toSave, activeTabId });
@@ -276,7 +275,7 @@ export default function Bento() {
 
   // Save mood boards whenever they change
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !onboarded) return;
     saveToStorage(STORAGE_KEYS.moodBoards, moodBoards);
   }, [moodBoards, hydrated]);
 

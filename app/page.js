@@ -202,6 +202,22 @@ function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodB
   );
 }
 
+/* ── localStorage helpers ── */
+const STORAGE_KEYS = {
+  settings: "bento_settings",
+  tabs: "bento_tabs",
+  moodBoards: "bento_moodboards",
+  tabCounter: "bento_tab_counter",
+};
+
+function saveToStorage(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("Storage save failed:", e); }
+}
+
+function loadFromStorage(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+
 /* ── Main ── */
 let tabCounter = 1;
 function createTab() {
@@ -214,8 +230,55 @@ export default function Bento() {
   const [onboarded, setOnboarded] = useState(false); const [moodBoards, setMoodBoards] = useState({});
   const [tabs, setTabs] = useState([createTab()]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
+  const [hydrated, setHydrated] = useState(false);
   const isGeneratingRef = useRef(false);
   const queueRef = useRef([]);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const settings = loadFromStorage(STORAGE_KEYS.settings, null);
+    if (settings) {
+      setBrand(settings.brand || ""); setAudience(settings.audience || "");
+      setTone(settings.tone || ""); setBrandStyle(settings.brandStyle || "");
+      setCompetitors(settings.competitors || []); setOnboarded(true);
+    }
+    const savedTabs = loadFromStorage(STORAGE_KEYS.tabs, null);
+    if (savedTabs && savedTabs.tabs && savedTabs.tabs.length > 0) {
+      // Restore tabs but clear loading/queued states
+      const restored = savedTabs.tabs.map(t => ({ ...t, loading: false, queued: false, error: null }));
+      setTabs(restored);
+      setActiveTabId(savedTabs.activeTabId || restored[0].id);
+      // Restore tab counter to avoid ID collisions
+      const maxId = Math.max(...restored.map(t => parseInt(t.id.replace("tab-", "")) || 0));
+      tabCounter = maxId + 1;
+    }
+    const savedCounter = loadFromStorage(STORAGE_KEYS.tabCounter, null);
+    if (savedCounter) tabCounter = Math.max(tabCounter, savedCounter);
+    const savedMoodBoards = loadFromStorage(STORAGE_KEYS.moodBoards, {});
+    setMoodBoards(savedMoodBoards);
+    setHydrated(true);
+  }, []);
+
+  // Save settings whenever they change
+  useEffect(() => {
+    if (!hydrated) return;
+    saveToStorage(STORAGE_KEYS.settings, { brand, audience, tone, brandStyle, competitors });
+  }, [brand, audience, tone, brandStyle, competitors, hydrated]);
+
+  // Save tabs whenever they change
+  useEffect(() => {
+    if (!hydrated) return;
+    // Only save tabs that aren't mid-loading, strip transient state
+    const toSave = tabs.map(t => ({ id: t.id, name: t.name, topic: t.topic, platform: t.platform, idea: t.idea, usage: t.usage }));
+    saveToStorage(STORAGE_KEYS.tabs, { tabs: toSave, activeTabId });
+    saveToStorage(STORAGE_KEYS.tabCounter, tabCounter);
+  }, [tabs, activeTabId, hydrated]);
+
+  // Save mood boards whenever they change
+  useEffect(() => {
+    if (!hydrated) return;
+    saveToStorage(STORAGE_KEYS.moodBoards, moodBoards);
+  }, [moodBoards, hydrated]);
 
   const updateTab = (id, updates) => { setTabs(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t)); };
   const addTab = () => { const nt = createTab(); setTabs(prev => [...prev, nt]); setActiveTabId(nt.id); };
@@ -247,6 +310,13 @@ export default function Bento() {
   };
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+
+  // Wait for localStorage to load before rendering
+  if (!hydrated) {
+    return (<div style={{ ...styles.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={styles.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...styles.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div>
+    </div>);
+  }
 
   if (!onboarded) {
     return (<div style={styles.app}><Onboarding onComplete={(b, a, t, s, c) => { setBrand(b); setAudience(a); setTone(t); setBrandStyle(s); setCompetitors(c); setOnboarded(true); }} /></div>);

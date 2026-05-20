@@ -124,11 +124,20 @@ function MoodBoard({ tabId, ideaIndex, moodBoards, setMoodBoards }) {
 }
 
 /* ── Idea Card ── */
-function IdeaCard({ idea, index, tabId, moodBoards, setMoodBoards }) {
+function IdeaCard({ idea, index, tabId, moodBoards, setMoodBoards, onSave, isSaved }) {
   const colors = ACCENT_SETS[index % 3];
   return (
     <div style={{ ...styles.bentoBox, borderColor: colors.border }}>
-      <div style={{ ...styles.bentoTop, background: colors.bg }}><div style={{ ...styles.formatTag, background: colors.tagBg, color: colors.tag }}>{idea.format}</div><h3 style={styles.angleTitle}>{idea.angle}</h3></div>
+      <div style={{ ...styles.bentoTop, background: colors.bg }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div><div style={{ ...styles.formatTag, background: colors.tagBg, color: colors.tag }}>{idea.format}</div><h3 style={styles.angleTitle}>{idea.angle}</h3></div>
+          {onSave && (
+            <button style={isSaved ? styles.savedBtn : styles.saveBtn} onClick={onSave} disabled={isSaved}>
+              {isSaved ? "✓ Saved" : "Save"}
+            </button>
+          )}
+        </div>
+      </div>
       <div style={styles.bentoGrid}>
         <div style={styles.bentoLeft}><div style={styles.compartmentLabel}><span>🔬</span> Research</div><div style={styles.researchStack}>{(idea.research || []).map((r, i) => <div key={i} style={styles.researchCard}><p style={styles.researchText}><ResearchPoint text={r.point} /></p><SourceLink source={r.source} /></div>)}</div></div>
         <div style={styles.bentoRight}><div style={styles.compartmentLabel}><span>📋</span> Content Brief</div><div style={styles.briefStack}>{(idea.brief || []).map((b, i) => <div key={i} style={styles.briefStep}><div style={{ ...styles.stepLabel, color: colors.tag, background: colors.tagBg }}>{b.step}</div><BriefContent content={b.content} /></div>)}</div></div>
@@ -159,8 +168,100 @@ function UsageCounter({ usage }) {
   );
 }
 
-/* ── Tab Content ── */
-function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodBoards, setMoodBoards, updateTab, requestGenerate }) {
+/* ── Save to Folder Modal ── */
+function SaveToFolderModal({ folders, onSave, onClose }) {
+  const [selectedFolder, setSelectedFolder] = useState(folders[0]?.id || "");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={{ ...styles.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalHeader}><h2 style={styles.modalTitle}>Save to folder</h2><button style={styles.closeBtn} onClick={onClose}>✕</button></div>
+        {folders.length > 0 && !showNew && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+            {folders.map(f => (
+              <div key={f.id} style={{ ...styles.folderOption, ...(selectedFolder === f.id ? styles.folderOptionActive : {}) }} onClick={() => setSelectedFolder(f.id)}>
+                <span>📁 {f.name}</span>
+                <span style={styles.folderCount}>{f.count || 0}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {showNew ? (
+          <div style={{ marginBottom: 16 }}>
+            <input style={styles.textInput} value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && newFolderName.trim()) onSave(null, newFolderName.trim()); }} />
+          </div>
+        ) : (
+          <button style={{ ...styles.secondaryBtn, width: "100%", marginBottom: 16 }} onClick={() => setShowNew(true)}>+ New folder</button>
+        )}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={styles.secondaryBtn} onClick={onClose}>Cancel</button>
+          <button style={{ ...styles.primaryBtn, opacity: (showNew ? newFolderName.trim() : selectedFolder) ? 1 : 0.4 }}
+            onClick={() => { if (showNew && newFolderName.trim()) onSave(null, newFolderName.trim()); else if (selectedFolder) onSave(selectedFolder, null); }}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Saved View ── */
+function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onRenameFolder }) {
+  const [activeFolder, setActiveFolder] = useState("all");
+  const filtered = activeFolder === "all" ? savedIdeas : savedIdeas.filter(s => s.folderId === activeFolder);
+  const [expandedId, setExpandedId] = useState(null);
+  return (
+    <div style={styles.savedLayout}>
+      <div style={styles.savedSidebar}>
+        <div style={{ ...styles.folderItem, ...(activeFolder === "all" ? styles.folderItemActive : {}) }} onClick={() => setActiveFolder("all")}>
+          <span>📋 All Saved</span><span style={styles.folderCount}>{savedIdeas.length}</span>
+        </div>
+        {folders.map(f => (
+          <div key={f.id} style={{ ...styles.folderItem, ...(activeFolder === f.id ? styles.folderItemActive : {}) }} onClick={() => setActiveFolder(f.id)}>
+            <span>📁 {f.name}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={styles.folderCount}>{savedIdeas.filter(s => s.folderId === f.id).length}</span>
+              <button style={styles.folderDeleteBtn} onClick={e => { e.stopPropagation(); onDeleteFolder(f.id); }} title="Delete folder">✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={styles.savedContent}>
+        {filtered.length === 0 && (
+          <div style={styles.empty}><p style={styles.emptyText}>{activeFolder === "all" ? "No saved ideas yet. Generate an idea and save it!" : "This folder is empty."}</p></div>
+        )}
+        {filtered.map(saved => (
+          <div key={saved.id} style={styles.savedCard}>
+            <div style={styles.savedCardHeader} onClick={() => setExpandedId(expandedId === saved.id ? null : saved.id)}>
+              <div>
+                <div style={styles.savedMeta}>
+                  <span style={styles.savedPlatform}>{saved.platform}</span>
+                  <span style={styles.savedTopic}>{saved.topic}</span>
+                  <span style={styles.savedDate}>{new Date(saved.savedAt).toLocaleDateString()}</span>
+                </div>
+                <h4 style={styles.savedAngle}>{saved.idea.angle}</h4>
+                <span style={styles.savedFormat}>{saved.idea.format}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button style={styles.moodRemove} onClick={e => { e.stopPropagation(); onDeleteIdea(saved.id); }} title="Remove">🗑</button>
+                <span style={{ color: "#C4B9A8", fontSize: 14 }}>{expandedId === saved.id ? "▲" : "▼"}</span>
+              </div>
+            </div>
+            {expandedId === saved.id && (
+              <div style={{ paddingTop: 12 }}>
+                <IdeaCard idea={saved.idea} index={0} tabId={`saved-${saved.id}`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab Content (updated with save) ── */
+function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
   const resultsRef = useRef(null);
   const handleGenerate = () => {
     if (!tab.topic.trim() || !brand.trim()) return;
@@ -190,7 +291,7 @@ function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodB
             <p style={styles.resultsLabel}>Idea for <span style={styles.topicHighlight}>"{tab.topic}"</span> on <span style={styles.topicHighlight}>{tab.platform}</span>{competitors.length > 0 && <span style={{ color: "#A39888" }}> · informed by {competitors.join(", ")}</span>}</p>
             <button style={styles.regenerateBtn} onClick={handleGenerate} disabled={tab.loading}>↻ Regenerate idea</button>
           </div>
-          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
+          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
           <UsageCounter usage={tab.usage} />
         </div>
       )}
@@ -208,6 +309,8 @@ const STORAGE_KEYS = {
   tabs: "bento_tabs",
   moodBoards: "bento_moodboards",
   tabCounter: "bento_tab_counter",
+  savedIdeas: "bento_saved_ideas",
+  folders: "bento_folders",
 };
 
 function saveToStorage(key, value) {
@@ -231,6 +334,10 @@ export default function Bento() {
   const [tabs, setTabs] = useState([createTab()]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
   const [hydrated, setHydrated] = useState(false);
+  const [view, setView] = useState("generate"); // "generate" or "saved"
+  const [savedIdeas, setSavedIdeas] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [showSaveModal, setShowSaveModal] = useState(null); // null or tab object
   const isGeneratingRef = useRef(false);
   const queueRef = useRef([]);
 
@@ -254,6 +361,10 @@ export default function Bento() {
     if (savedCounter) tabCounter = Math.max(tabCounter, savedCounter);
     const savedMoodBoards = loadFromStorage(STORAGE_KEYS.moodBoards, {});
     setMoodBoards(savedMoodBoards);
+    const si = loadFromStorage(STORAGE_KEYS.savedIdeas, []);
+    setSavedIdeas(si);
+    const sf = loadFromStorage(STORAGE_KEYS.folders, []);
+    setFolders(sf);
     setHydrated(true);
   }, []);
 
@@ -279,9 +390,45 @@ export default function Bento() {
     saveToStorage(STORAGE_KEYS.moodBoards, moodBoards);
   }, [moodBoards, hydrated]);
 
+  // Save savedIdeas whenever they change
+  useEffect(() => {
+    if (!hydrated || !onboarded) return;
+    saveToStorage(STORAGE_KEYS.savedIdeas, savedIdeas);
+  }, [savedIdeas, hydrated]);
+
+  // Save folders whenever they change
+  useEffect(() => {
+    if (!hydrated || !onboarded) return;
+    saveToStorage(STORAGE_KEYS.folders, folders);
+  }, [folders, hydrated]);
+
   const updateTab = (id, updates) => { setTabs(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t)); };
   const addTab = () => { const nt = createTab(); setTabs(prev => [...prev, nt]); setActiveTabId(nt.id); };
   const closeTab = (id) => { if (tabs.length === 1) return; const idx = tabs.findIndex(t => t.id === id); const nt = tabs.filter(t => t.id !== id); setTabs(nt); if (activeTabId === id) setActiveTabId(nt[Math.max(0, idx - 1)].id); };
+
+  // Save idea flow
+  const onSaveIdea = (tab) => { setShowSaveModal(tab); };
+  const handleSaveToFolder = (folderId, newFolderName) => {
+    let targetFolderId = folderId;
+    if (newFolderName) {
+      targetFolderId = `folder-${Date.now()}`;
+      setFolders(prev => [...prev, { id: targetFolderId, name: newFolderName }]);
+    }
+    const tab = showSaveModal;
+    if (!tab || !tab.idea) return;
+    const saved = { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: targetFolderId, savedAt: Date.now() };
+    setSavedIdeas(prev => [...prev, saved]);
+    setShowSaveModal(null);
+  };
+  const isIdeaSaved = (tab) => {
+    if (!tab.idea) return false;
+    return savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic);
+  };
+  const deleteIdea = (id) => { setSavedIdeas(prev => prev.filter(s => s.id !== id)); };
+  const deleteFolder = (id) => {
+    setFolders(prev => prev.filter(f => f.id !== id));
+    setSavedIdeas(prev => prev.filter(s => s.folderId !== id));
+  };
 
   const runGenerate = async (tabId, topic, platform, resultsRef) => {
     isGeneratingRef.current = true;
@@ -324,30 +471,44 @@ export default function Bento() {
   return (
     <div style={styles.app}>
       {showSettings && <SettingsModal brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} onSave={(b, a, t, s, c) => { setBrand(b); setAudience(a); setTone(t); setBrandStyle(s); setCompetitors(c); }} onClose={() => setShowSettings(false)} />}
+      {showSaveModal && <SaveToFolderModal folders={folders.map(f => ({ ...f, count: savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
       <header style={styles.header}>
         <div style={styles.headerLeft}><div style={styles.headerBento}><div style={{ ...styles.hbCell, background: "#D4857A" }} /><div style={{ ...styles.hbCell, background: "#9B72AA" }} /><div style={{ ...styles.hbCell, background: "#6B937A" }} /><div style={{ ...styles.hbCell, background: "#E8C869" }} /></div><span style={styles.headerName}>Bento</span></div>
-        <button style={styles.settingsBtn} onClick={() => setShowSettings(true)}>Settings ⚙</button>
+        <div style={styles.headerRight}>
+          <button style={{ ...styles.viewToggle, ...(view === "generate" ? styles.viewToggleActive : {}) }} onClick={() => setView("generate")}>Generate</button>
+          <button style={{ ...styles.viewToggle, ...(view === "saved" ? styles.viewToggleActive : {}) }} onClick={() => setView("saved")}>Saved{savedIdeas.length > 0 ? ` (${savedIdeas.length})` : ""}</button>
+          <button style={styles.settingsBtn} onClick={() => setShowSettings(true)}>⚙</button>
+        </div>
       </header>
 
-      <div style={styles.tabBar}>
-        <div style={styles.tabList}>
-          {tabs.map(tab => (
-            <div key={tab.id} style={{ ...styles.tab, ...(tab.id === activeTabId ? styles.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
-              <span style={styles.tabName}>
-                {tab.loading && !tab.queued && <span style={styles.tabSpinner}>⟳</span>}
-                {tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}
-                {tab.name}
-              </span>
-              {tabs.length > 1 && <button style={styles.tabClose} onClick={e => { e.stopPropagation(); closeTab(tab.id); }}>✕</button>}
+      {view === "generate" && (
+        <>
+          <div style={styles.tabBar}>
+            <div style={styles.tabList}>
+              {tabs.map(tab => (
+                <div key={tab.id} style={{ ...styles.tab, ...(tab.id === activeTabId ? styles.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
+                  <span style={styles.tabName}>
+                    {tab.loading && !tab.queued && <span style={styles.tabSpinner}>⟳</span>}
+                    {tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}
+                    {tab.name}
+                  </span>
+                  {tabs.length > 1 && <button style={styles.tabClose} onClick={e => { e.stopPropagation(); closeTab(tab.id); }}>✕</button>}
+                </div>
+              ))}
+              <button style={styles.tabAdd} onClick={addTab}>+ New</button>
             </div>
-          ))}
-          <button style={styles.tabAdd} onClick={addTab}>+ New</button>
-        </div>
-      </div>
+          </div>
+          <main style={styles.main}>
+            <TabContent key={activeTab.id} tab={activeTab} brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} moodBoards={moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} onSaveIdea={onSaveIdea} isIdeaSaved={isIdeaSaved} />
+          </main>
+        </>
+      )}
 
-      <main style={styles.main}>
-        <TabContent key={activeTab.id} tab={activeTab} brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} moodBoards={moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} />
-      </main>
+      {view === "saved" && (
+        <main style={styles.main}>
+          <SavedView savedIdeas={savedIdeas} folders={folders} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} />
+        </main>
+      )}
     </div>
   );
 }
@@ -369,6 +530,11 @@ const styles = {
   headerBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, width: 22, height: 22, borderRadius: 4, overflow: "hidden" },
   hbCell: { borderRadius: 2 }, headerName: { fontSize: 18, fontWeight: 800, letterSpacing: "-0.03em" },
   settingsBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", cursor: "pointer", fontFamily: "inherit" },
+  headerRight: { display: "flex", alignItems: "center", gap: 6 },
+  viewToggle: { background: "none", border: "1px solid transparent", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#A39888", cursor: "pointer", fontFamily: "inherit" },
+  viewToggleActive: { color: "#1C1917", background: "#FAF8F5", border: "1px solid #DDD5CA" },
+  saveBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  savedBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#6B937A", background: "#F1F7F3", border: "1.5px solid #E1EDE5", borderRadius: 8, cursor: "default", fontFamily: "inherit", whiteSpace: "nowrap" },
   tabBar: { borderBottom: "1px solid #E8E2D9", background: "#FFFEFB", padding: "0 32px", position: "sticky", top: 53, zIndex: 19 },
   tabList: { display: "flex", alignItems: "center", gap: 2, overflowX: "auto" },
   tab: { display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontSize: 13, fontWeight: 500, color: "#A39888", cursor: "pointer", borderBottom: "2px solid transparent", whiteSpace: "nowrap", fontFamily: "inherit" },
@@ -465,4 +631,25 @@ const styles = {
   brandTextarea: { width: "100%", padding: "13px 14px", fontSize: 13, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 },
   primaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 700, color: "#FFF", background: "#C07A8E", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
   secondaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: "#78716C", background: "#FAF8F5", border: "1.5px solid #DDD5CA", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
+
+  // Folder modal
+  folderOption: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, border: "1.5px solid #EDE8DF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" },
+  folderOptionActive: { borderColor: "#C07A8E", background: "#FFF4F2" },
+  folderCount: { fontSize: 11, color: "#A39888", fontWeight: 600 },
+
+  // Saved view
+  savedLayout: { display: "grid", gridTemplateColumns: "240px 1fr", gap: 24, minHeight: 400 },
+  savedSidebar: { display: "flex", flexDirection: "column", gap: 4 },
+  folderItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, color: "#78716C" },
+  folderItemActive: { background: "#FFF4F2", color: "#1C1917", fontWeight: 700 },
+  folderDeleteBtn: { background: "none", border: "none", color: "#C4B9A8", fontSize: 10, cursor: "pointer", padding: 2, opacity: 0.5 },
+  savedContent: { display: "flex", flexDirection: "column", gap: 12 },
+  savedCard: { background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 14, padding: "16px 20px", cursor: "pointer" },
+  savedCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+  savedMeta: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
+  savedPlatform: { fontSize: 11, fontWeight: 700, color: "#C07A8E", textTransform: "uppercase", letterSpacing: "0.06em" },
+  savedTopic: { fontSize: 11, color: "#A39888" },
+  savedDate: { fontSize: 11, color: "#C4B9A8" },
+  savedAngle: { fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: "#1C1917", lineHeight: 1.35 },
+  savedFormat: { fontSize: 12, color: "#78716C" },
 };

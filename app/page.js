@@ -123,8 +123,133 @@ function MoodBoard({ tabId, ideaIndex, moodBoards, setMoodBoards }) {
   );
 }
 
+/* ── Social Preview ── */
+function SocialPreview({ idea, platform }) {
+  const brief = idea.brief || [];
+  const format = (idea.format || "").toLowerCase();
+
+  // Extract text from brief content
+  const extractField = (content, field) => {
+    const m = (content || "").match(new RegExp(`${field}:\\s*(.*)`, "i"));
+    return m ? m[1].trim() : "";
+  };
+
+  // ── Instagram / Carousel ──
+  if (platform === "Instagram" && (format.includes("carousel") || format.includes("multi-slide"))) {
+    return (
+      <div style={styles.previewSection}>
+        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+        <div style={styles.carouselScroll}>
+          {brief.map((slide, i) => (
+            <div key={i} style={styles.igSlide}>
+              <div style={styles.igSlideNum}>{i + 1}</div>
+              <h4 style={styles.igSlideHeadline}>{extractField(slide.content, "Headline") || slide.step}</h4>
+              <p style={styles.igSlideBody}>{extractField(slide.content, "Body")}</p>
+              <p style={styles.igSlideVisual}>{extractField(slide.content, "Visual")}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Instagram / Reel or TikTok ──
+  if (platform === "TikTok" || format.includes("reel") || format.includes("video") || format.includes("short")) {
+    return (
+      <div style={styles.previewSection}>
+        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+        <div style={styles.reelFrame}>
+          <div style={styles.reelContent}>
+            {brief.map((scene, i) => (
+              <div key={i} style={styles.reelScene}>
+                <div style={styles.reelTiming}>{extractField(scene.content, "Timing") || scene.step}</div>
+                <p style={styles.reelText}>{extractField(scene.content, "On-screen text") || extractField(scene.content, "Text")}</p>
+                <p style={styles.reelVo}>{extractField(scene.content, "Voiceover")}</p>
+              </div>
+            ))}
+          </div>
+          <div style={styles.reelSidebar}>
+            <div style={styles.reelIcon}>♥</div>
+            <div style={styles.reelIcon}>💬</div>
+            <div style={styles.reelIcon}>↗</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LinkedIn ──
+  if (platform === "LinkedIn") {
+    const hook = extractField(brief[0]?.content, "Hook") || extractField(brief[0]?.content, "Headline") || brief[0]?.content || "";
+    const body = extractField(brief[0]?.content, "Body") || (brief.length > 1 ? brief.slice(1).map(b => extractField(b.content, "Body") || b.content).join(" ") : "");
+    const cta = brief.map(b => extractField(b.content, "CTA")).filter(Boolean).join(" ");
+    return (
+      <div style={styles.previewSection}>
+        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+        <div style={styles.liPost}>
+          <div style={styles.liHeader}><div style={styles.liAvatar} /><div><div style={styles.liName}>Your Brand</div><div style={styles.liMeta}>Content Marketing · 1h</div></div></div>
+          <div style={styles.liBody}><p style={styles.liHook}>{hook.substring(0, 150)}{hook.length > 150 ? "..." : ""}</p><p style={styles.liText}>{body.substring(0, 200)}{body.length > 200 ? "..." : ""}</p>{cta && <p style={styles.liCta}>{cta}</p>}</div>
+          <div style={styles.liActions}><span>👍 Like</span><span>💬 Comment</span><span>↗ Repost</span><span>📤 Send</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Twitter ──
+  if (platform === "Twitter") {
+    return (
+      <div style={styles.previewSection}>
+        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+        <div style={styles.tweetThread}>
+          {brief.slice(0, 5).map((tweet, i) => (
+            <div key={i} style={styles.tweetCard}>
+              <div style={styles.tweetHeader}><div style={styles.tweetAvatar} /><div><span style={styles.tweetName}>Your Brand</span><span style={styles.tweetHandle}>@yourbrand</span></div></div>
+              <p style={styles.tweetBody}>{(extractField(tweet.content, "Hook") || extractField(tweet.content, "Body") || extractField(tweet.content, "Text") || tweet.content || "").substring(0, 280)}</p>
+              {i < brief.length - 1 && <div style={styles.tweetThreadLine} />}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Blog ──
+  if (platform === "Blog") {
+    return (
+      <div style={styles.previewSection}>
+        <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+        <div style={styles.blogPreview}>
+          <h2 style={styles.blogTitle}>{idea.angle}</h2>
+          <div style={styles.blogMeta}>By Your Brand · {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+          {brief.slice(0, 4).map((section, i) => (
+            <div key={i} style={styles.blogSection}>
+              <h3 style={styles.blogH2}>{extractField(section.content, "H2") || section.step}</h3>
+              <p style={styles.blogBody}>{(extractField(section.content, "Key points") || extractField(section.content, "Body") || "").substring(0, 120)}...</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Instagram Single Image / Infographic / fallback ──
+  return (
+    <div style={styles.previewSection}>
+      <div style={styles.compartmentLabel}><span>📱</span> Social Preview</div>
+      <div style={styles.igSingle}>
+        <div style={styles.igSingleHeader}><div style={styles.igSingleAvatar} /><span style={styles.igSingleName}>yourbrand</span></div>
+        <div style={styles.igSingleImage}>
+          <h4 style={styles.igSingleHeadline}>{extractField(brief[0]?.content, "Headline") || idea.angle}</h4>
+          <p style={styles.igSingleBody}>{(extractField(brief[0]?.content, "Body") || "").substring(0, 100)}</p>
+        </div>
+        <div style={styles.igSingleActions}><span>♥</span><span>💬</span><span>↗</span></div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Idea Card ── */
-function IdeaCard({ idea, index, tabId, moodBoards, setMoodBoards, onSave, isSaved }) {
+function IdeaCard({ idea, index, tabId, platform, moodBoards, setMoodBoards, onSave, isSaved }) {
   const colors = ACCENT_SETS[index % 3];
   return (
     <div style={{ ...styles.bentoBox, borderColor: colors.border }}>
@@ -142,6 +267,7 @@ function IdeaCard({ idea, index, tabId, moodBoards, setMoodBoards, onSave, isSav
         <div style={styles.bentoLeft}><div style={styles.compartmentLabel}><span>🔬</span> Research</div><div style={styles.researchStack}>{(idea.research || []).map((r, i) => <div key={i} style={styles.researchCard}><p style={styles.researchText}><ResearchPoint text={r.point} /></p><SourceLink source={r.source} /></div>)}</div></div>
         <div style={styles.bentoRight}><div style={styles.compartmentLabel}><span>📋</span> Content Brief</div><div style={styles.briefStack}>{(idea.brief || []).map((b, i) => <div key={i} style={styles.briefStep}><div style={{ ...styles.stepLabel, color: colors.tag, background: colors.tagBg }}>{b.step}</div><BriefContent content={b.content} /></div>)}</div></div>
       </div>
+      {platform && <SocialPreview idea={idea} platform={platform} />}
       <VisualDirection vd={idea.visual_direction} />
       <MoodBoard tabId={tabId} ideaIndex={index} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
       <div style={{ ...styles.bentoBottom, borderTopColor: colors.border }}><span style={styles.whyLabel}>✨ Why this works</span><p style={styles.whyText}>{idea.why}</p></div>
@@ -207,10 +333,11 @@ function SaveToFolderModal({ folders, onSave, onClose }) {
 }
 
 /* ── Saved View ── */
-function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onRenameFolder }) {
+function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea }) {
   const [activeFolder, setActiveFolder] = useState("all");
   const filtered = activeFolder === "all" ? savedIdeas : savedIdeas.filter(s => s.folderId === activeFolder);
   const [expandedId, setExpandedId] = useState(null);
+  const [movingId, setMovingId] = useState(null); // id of idea being moved
   return (
     <div style={styles.savedLayout}>
       <div style={styles.savedSidebar}>
@@ -222,7 +349,7 @@ function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIde
             <span>📁 {f.name}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={styles.folderCount}>{savedIdeas.filter(s => s.folderId === f.id).length}</span>
-              <button style={styles.folderDeleteBtn} onClick={e => { e.stopPropagation(); onDeleteFolder(f.id); }} title="Delete folder">✕</button>
+              <button style={styles.folderDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm(`Delete folder "${f.name}" and all ideas in it? This can't be undone.`)) onDeleteFolder(f.id); }} title="Delete folder">✕</button>
             </div>
           </div>
         ))}
@@ -244,13 +371,22 @@ function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIde
                 <span style={styles.savedFormat}>{saved.idea.format}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button style={styles.moodRemove} onClick={e => { e.stopPropagation(); onDeleteIdea(saved.id); }} title="Remove">🗑</button>
+                <button style={styles.savedMoveBtn} onClick={e => { e.stopPropagation(); setMovingId(movingId === saved.id ? null : saved.id); }} title="Move to folder">Move</button>
+                <button style={styles.savedDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm("Delete this saved idea? This can't be undone.")) onDeleteIdea(saved.id); }} title="Delete">Delete</button>
                 <span style={{ color: "#C4B9A8", fontSize: 14 }}>{expandedId === saved.id ? "▲" : "▼"}</span>
               </div>
             </div>
+            {movingId === saved.id && (
+              <div style={styles.moveDropdown}>
+                {folders.filter(f => f.id !== saved.folderId).map(f => (
+                  <div key={f.id} style={styles.moveOption} onClick={e => { e.stopPropagation(); onMoveIdea(saved.id, f.id); setMovingId(null); }}>📁 {f.name}</div>
+                ))}
+                {folders.filter(f => f.id !== saved.folderId).length === 0 && <div style={styles.moveOptionEmpty}>No other folders</div>}
+              </div>
+            )}
             {expandedId === saved.id && (
               <div style={{ paddingTop: 12 }}>
-                <IdeaCard idea={saved.idea} index={0} tabId={`saved-${saved.id}`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
+                <IdeaCard idea={saved.idea} index={0} tabId={`saved-${saved.id}`} platform={saved.platform} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
               </div>
             )}
           </div>
@@ -291,7 +427,7 @@ function TabContent({ tab, brand, audience, tone, brandStyle, competitors, moodB
             <p style={styles.resultsLabel}>Idea for <span style={styles.topicHighlight}>"{tab.topic}"</span> on <span style={styles.topicHighlight}>{tab.platform}</span>{competitors.length > 0 && <span style={{ color: "#A39888" }}> · informed by {competitors.join(", ")}</span>}</p>
             <button style={styles.regenerateBtn} onClick={handleGenerate} disabled={tab.loading}>↻ Regenerate idea</button>
           </div>
-          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
+          <IdeaCard idea={tab.idea} index={0} tabId={tab.id} platform={tab.platform} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
           <UsageCounter usage={tab.usage} />
         </div>
       )}
@@ -429,6 +565,9 @@ export default function Bento() {
     setFolders(prev => prev.filter(f => f.id !== id));
     setSavedIdeas(prev => prev.filter(s => s.folderId !== id));
   };
+  const moveIdea = (ideaId, newFolderId) => {
+    setSavedIdeas(prev => prev.map(s => s.id === ideaId ? { ...s, folderId: newFolderId } : s));
+  };
 
   const runGenerate = async (tabId, topic, platform, resultsRef) => {
     isGeneratingRef.current = true;
@@ -473,7 +612,7 @@ export default function Bento() {
       {showSettings && <SettingsModal brand={brand} audience={audience} tone={tone} brandStyle={brandStyle} competitors={competitors} onSave={(b, a, t, s, c) => { setBrand(b); setAudience(a); setTone(t); setBrandStyle(s); setCompetitors(c); }} onClose={() => setShowSettings(false)} />}
       {showSaveModal && <SaveToFolderModal folders={folders.map(f => ({ ...f, count: savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
       <header style={styles.header}>
-        <div style={styles.headerLeft}><div style={styles.headerBento}><div style={{ ...styles.hbCell, background: "#D4857A" }} /><div style={{ ...styles.hbCell, background: "#9B72AA" }} /><div style={{ ...styles.hbCell, background: "#6B937A" }} /><div style={{ ...styles.hbCell, background: "#E8C869" }} /></div><span style={styles.headerName}>Bento</span></div>
+        <div style={{ ...styles.headerLeft, cursor: "pointer" }} onClick={() => setView("generate")}><div style={styles.headerBento}><div style={{ ...styles.hbCell, background: "#D4857A" }} /><div style={{ ...styles.hbCell, background: "#9B72AA" }} /><div style={{ ...styles.hbCell, background: "#6B937A" }} /><div style={{ ...styles.hbCell, background: "#E8C869" }} /></div><span style={styles.headerName}>Bento</span></div>
         <div style={styles.headerRight}>
           <button style={{ ...styles.viewToggle, ...(view === "generate" ? styles.viewToggleActive : {}) }} onClick={() => setView("generate")}>Generate</button>
           <button style={{ ...styles.viewToggle, ...(view === "saved" ? styles.viewToggleActive : {}) }} onClick={() => setView("saved")}>Saved{savedIdeas.length > 0 ? ` (${savedIdeas.length})` : ""}</button>
@@ -506,7 +645,7 @@ export default function Bento() {
 
       {view === "saved" && (
         <main style={styles.main}>
-          <SavedView savedIdeas={savedIdeas} folders={folders} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} />
+          <SavedView savedIdeas={savedIdeas} folders={folders} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} />
         </main>
       )}
     </div>
@@ -616,6 +755,67 @@ const styles = {
   usageItem: { fontSize: 11, color: "#A39888", fontFamily: "monospace" },
   usageDot: { fontSize: 11, color: "#DDD5CA" },
   bentoBottom: { padding: "18px 28px", borderTop: "1px solid #E8E2D9", background: "#FDFCFA" },
+
+  // Social Preview - shared
+  previewSection: { padding: "22px 24px", borderTop: "1px solid #E8E2D9", background: "#F9F8F6" },
+
+  // Carousel
+  carouselScroll: { display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 },
+  igSlide: { minWidth: 220, maxWidth: 220, background: "#FFF", borderRadius: 12, padding: "20px 18px", border: "1px solid #E8E2D9", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 },
+  igSlideNum: { fontSize: 10, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" },
+  igSlideHeadline: { fontSize: 14, fontWeight: 800, color: "#1C1917", lineHeight: 1.3, margin: 0 },
+  igSlideBody: { fontSize: 12, color: "#44403C", lineHeight: 1.5, margin: 0 },
+  igSlideVisual: { fontSize: 11, color: "#A39888", fontStyle: "italic", marginTop: "auto" },
+
+  // Reel / TikTok
+  reelFrame: { width: 260, background: "#0F0F0F", borderRadius: 20, padding: "24px 16px", display: "flex", position: "relative", minHeight: 420 },
+  reelContent: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 12 },
+  reelScene: { padding: "8px 0" },
+  reelTiming: { fontSize: 10, color: "#C07A8E", fontWeight: 700, marginBottom: 4 },
+  reelText: { fontSize: 15, fontWeight: 800, color: "#FFF", lineHeight: 1.3, margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.5)" },
+  reelVo: { fontSize: 11, color: "rgba(255,255,255,0.6)", fontStyle: "italic", margin: "4px 0 0" },
+  reelSidebar: { position: "absolute", right: 12, bottom: 80, display: "flex", flexDirection: "column", gap: 18, alignItems: "center" },
+  reelIcon: { fontSize: 20, opacity: 0.8 },
+
+  // LinkedIn
+  liPost: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", maxWidth: 500, overflow: "hidden" },
+  liHeader: { display: "flex", alignItems: "center", gap: 10, padding: "14px 16px" },
+  liAvatar: { width: 40, height: 40, borderRadius: "50%", background: "#E8E2D9" },
+  liName: { fontSize: 13, fontWeight: 700, color: "#1C1917" },
+  liMeta: { fontSize: 11, color: "#A39888" },
+  liBody: { padding: "0 16px 14px" },
+  liHook: { fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.4 },
+  liText: { fontSize: 13, color: "#44403C", lineHeight: 1.55, margin: "0 0 8px" },
+  liCta: { fontSize: 13, color: "#C07A8E", fontWeight: 600, margin: 0 },
+  liActions: { display: "flex", justifyContent: "space-around", padding: "10px 16px", borderTop: "1px solid #EDE8DF", fontSize: 12, color: "#78716C" },
+
+  // Twitter
+  tweetThread: { display: "flex", flexDirection: "column", gap: 0, maxWidth: 480, borderRadius: 12, overflow: "hidden", border: "1px solid #E8E2D9" },
+  tweetCard: { background: "#FFF", padding: "14px 16px", borderBottom: "1px solid #EDE8DF", position: "relative" },
+  tweetHeader: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
+  tweetAvatar: { width: 32, height: 32, borderRadius: "50%", background: "#E8E2D9" },
+  tweetName: { fontSize: 13, fontWeight: 700, color: "#1C1917", marginRight: 4 },
+  tweetHandle: { fontSize: 12, color: "#A39888" },
+  tweetBody: { fontSize: 14, color: "#1C1917", lineHeight: 1.45, margin: 0 },
+  tweetThreadLine: { position: "absolute", left: 31, bottom: -1, width: 2, height: 16, background: "#DDD5CA" },
+
+  // Blog
+  blogPreview: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", padding: "28px 32px", maxWidth: 560 },
+  blogTitle: { fontSize: 22, fontWeight: 800, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.25 },
+  blogMeta: { fontSize: 12, color: "#A39888", marginBottom: 20 },
+  blogSection: { marginBottom: 16 },
+  blogH2: { fontSize: 15, fontWeight: 700, color: "#1C1917", margin: "0 0 4px" },
+  blogBody: { fontSize: 13, color: "#44403C", lineHeight: 1.55, margin: 0 },
+
+  // IG Single / Infographic
+  igSingle: { background: "#FFF", borderRadius: 12, border: "1px solid #E8E2D9", maxWidth: 340, overflow: "hidden" },
+  igSingleHeader: { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" },
+  igSingleAvatar: { width: 28, height: 28, borderRadius: "50%", background: "#E8E2D9" },
+  igSingleName: { fontSize: 12, fontWeight: 700, color: "#1C1917" },
+  igSingleImage: { background: "#FAF8F5", padding: "32px 24px", minHeight: 260, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" },
+  igSingleHeadline: { fontSize: 18, fontWeight: 800, color: "#1C1917", margin: "0 0 8px", lineHeight: 1.3 },
+  igSingleBody: { fontSize: 13, color: "#44403C", lineHeight: 1.5, margin: 0 },
+  igSingleActions: { display: "flex", gap: 14, padding: "10px 14px", fontSize: 18 },
   whyLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A39888", display: "block", marginBottom: 6 },
   whyText: { fontSize: 13, lineHeight: 1.6, color: "#57534E", margin: 0 },
   empty: { display: "flex", flexDirection: "column", alignItems: "center", padding: "100px 20px" },
@@ -652,4 +852,9 @@ const styles = {
   savedDate: { fontSize: 11, color: "#C4B9A8" },
   savedAngle: { fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: "#1C1917", lineHeight: 1.35 },
   savedFormat: { fontSize: 12, color: "#78716C" },
+  savedDeleteBtn: { background: "none", border: "1px solid #FECDCA", borderRadius: 6, color: "#B42318", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" },
+  savedMoveBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 6, color: "#78716C", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" },
+  moveDropdown: { display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderTop: "1px solid #EDE8DF", marginTop: 10 },
+  moveOption: { padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#44403C" },
+  moveOptionEmpty: { padding: "8px 12px", fontSize: 12, color: "#C4B9A8", fontStyle: "italic" },
 };

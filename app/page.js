@@ -196,14 +196,124 @@ function ProjectSetup({ onComplete, isFirst }) {
 }
 
 /* ══════════════════════════════════════════
+   Export helpers
+   ══════════════════════════════════════════ */
+function buildPrintHtml(ideas, folderName) {
+  const clean = (t) => (t || "").replace(/<\/?key>/g, "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const bullets = (t) => (t || "").split("•").filter(Boolean).map(b => `<li>${clean(b.trim())}</li>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${folderName} — Bento Export</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #1C1917; padding: 40px; font-size: 11pt; line-height: 1.6; }
+  .idea { page-break-after: always; margin-bottom: 40px; }
+  .idea:last-child { page-break-after: auto; }
+  .header { border-bottom: 2px solid #C07A8E; padding-bottom: 12px; margin-bottom: 20px; }
+  .header h1 { font-size: 10pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+  .header .meta { font-size: 9pt; color: #A39888; margin-top: 4px; }
+  .format { font-size: 9pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
+  .angle { font-size: 18pt; font-weight: 800; margin-bottom: 20px; line-height: 1.25; }
+  .section-title { font-size: 9pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 24px 0 12px; }
+  .research-item { background: #FAF8F5; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #EDE8DF; }
+  .research-item p { font-size: 10pt; color: #44403C; margin-bottom: 4px; }
+  .research-item .source { font-size: 8pt; color: #A39888; font-style: italic; }
+  .brief-step { margin-bottom: 12px; }
+  .step-label { display: inline-block; font-size: 8pt; font-weight: 700; color: #C07A8E; background: #FFF4F2; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; }
+  .brief-line { font-size: 10pt; color: #44403C; margin-bottom: 2px; }
+  .brief-line strong { color: #1C1917; }
+  .vd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .vd-card { background: #FAF8F5; border-radius: 6px; padding: 12px; border: 1px solid #EDE8DF; }
+  .vd-label { font-size: 8pt; color: #A39888; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
+  .vd-mood { font-size: 13pt; font-weight: 700; }
+  .vd-card ul { padding-left: 16px; font-size: 10pt; color: #44403C; }
+  .vd-card li { margin-bottom: 4px; }
+  .ref-handle { font-size: 10pt; font-weight: 700; color: #C07A8E; }
+  .ref-note { font-size: 9pt; color: #78716C; font-style: italic; }
+  .why { font-size: 10pt; color: #44403C; margin-top: 8px; }
+  .divider { border: none; border-top: 1px solid #E8E2D9; margin: 20px 0; }
+  @media print { body { padding: 20px; } .idea { page-break-after: always; } }
+</style></head><body>
+${ideas.map((saved, idx) => {
+    const idea = saved.idea;
+    const vd = idea.visual_direction || {};
+    const refs = vd.references || vd.reference_accounts || [];
+    const briefContent = (content) => {
+      return (content || "").split(/(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):)/gi)
+        .map(line => { const m = line.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):\s*(.*)/is); return m ? `<div class="brief-line"><strong>${m[1]}:</strong> ${clean(m[2].trim())}</div>` : line.trim() ? `<div class="brief-line">${clean(line.trim())}</div>` : ""; }).join("");
+    };
+    return `<div class="idea">
+      <div class="header"><h1>Bento</h1><div class="meta">${saved.platform} · ${clean(saved.topic)}</div></div>
+      <div class="format">${clean(idea.format)}</div>
+      <div class="angle">${clean(idea.angle)}</div>
+      <div class="section-title">🔬 Research</div>
+      ${(idea.research || []).map(r => `<div class="research-item"><p>${clean(r.point)}</p><div class="source">${clean(r.source)}</div></div>`).join("")}
+      <hr class="divider">
+      <div class="section-title">📋 Content Brief</div>
+      ${(idea.brief || []).map(b => `<div class="brief-step"><div class="step-label">${clean(b.step)}</div>${briefContent(b.content)}</div>`).join("")}
+      <hr class="divider">
+      <div class="section-title">🎨 Visual Direction</div>
+      <div class="vd-grid">
+        ${vd.mood ? `<div class="vd-card"><div class="vd-label">Mood</div><div class="vd-mood">${clean(vd.mood)}</div></div>` : ""}
+        ${vd.layout ? `<div class="vd-card"><div class="vd-label">Layout</div><ul>${bullets(vd.layout)}</ul></div>` : ""}
+        ${(vd.creative_concept || vd.imagery_and_icons) ? `<div class="vd-card"><div class="vd-label">Creative Concept</div><ul>${bullets(vd.creative_concept || vd.imagery_and_icons)}</ul></div>` : ""}
+        ${refs.length > 0 ? `<div class="vd-card"><div class="vd-label">${refs.some(r => r.handle?.includes("http")) ? "Reference Articles" : "Study These Accounts"}</div>${refs.map(r => `<div><span class="ref-handle">${clean(r.handle)}</span><br><span class="ref-note">${clean(r.note)}</span></div>`).join("")}</div>` : ""}
+      </div>
+      <hr class="divider">
+      <div class="section-title">✨ Why This Works</div>
+      <div class="why">${clean(idea.why)}</div>
+    </div>`;
+  }).join("")}
+</body></html>`;
+}
+
+function exportPdf(ideas, folderName) {
+  const html = buildPrintHtml(ideas, folderName);
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
+async function exportDocx(ideas, folderName, brand) {
+  try {
+    const res = await fetch("/api/export/docx", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ideas: ideas.map(s => ({ idea: s.idea, topic: s.topic, platform: s.platform })), folderName, brand }),
+    });
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${folderName.replace(/[^a-zA-Z0-9]/g, "-")}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) { console.error(err); alert("Export failed. Please try again."); }
+}
+
+/* ══════════════════════════════════════════
    Saved View
    ══════════════════════════════════════════ */
-function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea, onCreateFolder }) {
+function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea, onCreateFolder, brand }) {
   const [activeFolder, setActiveFolder] = useState("all");
   const filtered = activeFolder === "all" ? savedIdeas : savedIdeas.filter(s => s.folderId === activeFolder);
   const [expandedId, setExpandedId] = useState(null);
   const [movingId, setMovingId] = useState(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [exporting, setExporting] = useState(null);
+  const activeFolderName = activeFolder === "all" ? "All Saved" : (folders.find(f => f.id === activeFolder)?.name || "Folder");
+
+  const handleExport = async (format) => {
+    if (filtered.length === 0) return;
+    setExporting(format);
+    try {
+      if (format === "pdf") exportPdf(filtered, activeFolderName);
+      else await exportDocx(filtered, activeFolderName, brand);
+    } catch (err) { console.error(err); }
+    finally { setExporting(null); }
+  };
+
   return (
     <>
       {showNewFolder && <NewFolderModal onSave={(name) => { onCreateFolder(name); setShowNewFolder(false); }} onClose={() => setShowNewFolder(false)} />}
@@ -224,6 +334,15 @@ function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIde
           <button style={S.newFolderBtn} onClick={() => setShowNewFolder(true)}>+ New folder</button>
         </div>
         <div style={S.savedContent}>
+          {filtered.length > 0 && (
+            <div style={S.savedContentHeader}>
+              <h3 style={S.savedContentTitle}>{activeFolderName}</h3>
+              <div style={S.exportActions}>
+                <button style={S.exportBtn} onClick={() => handleExport("pdf")} disabled={!!exporting}>{exporting === "pdf" ? "Exporting..." : "↓ Export PDF"}</button>
+                <button style={S.exportBtn} onClick={() => handleExport("docx")} disabled={!!exporting}>{exporting === "docx" ? "Exporting..." : "↓ Export Word"}</button>
+              </div>
+            </div>
+          )}
           {filtered.length === 0 && <div style={S.empty}><p style={S.emptyText}>{activeFolder === "all" ? "No saved ideas yet. Generate an idea and save it!" : "This folder is empty."}</p></div>}
           {filtered.map(saved => (
             <div key={saved.id} style={S.savedCard}>
@@ -259,29 +378,7 @@ function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIde
    ══════════════════════════════════════════ */
 function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
   const resultsRef = useRef(null);
-  const [exporting, setExporting] = useState(null);
   const go = () => { if (tab.topic.trim() && project.brand.trim()) requestGenerate(tab.id, tab.topic, tab.platform, resultsRef); };
-
-  const exportAs = async (format) => {
-    if (!tab.idea) return;
-    setExporting(format);
-    try {
-      const res = await fetch(`/api/export/${format}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea: tab.idea, topic: tab.topic, platform: tab.platform, brand: project.brand }),
-      });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bento-${tab.topic.replace(/[^a-zA-Z0-9]/g, "-").substring(0, 30)}.${format === "docx" ? "docx" : "pdf"}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) { console.error(err); alert("Export failed. Please try again."); }
-    finally { setExporting(null); }
-  };
-
   return (
     <div>
       <div style={S.inputCard}>
@@ -299,11 +396,7 @@ function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, reques
         <div ref={resultsRef} style={S.results}>
           <div style={S.resultsHeader}>
             <p style={S.resultsLabel}>Idea for <span style={S.topicHighlight}>"{tab.topic}"</span> on <span style={S.topicHighlight}>{tab.platform}</span></p>
-            <div style={S.resultsActions}>
-              <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate</button>
-              <button style={S.exportBtn} onClick={() => exportAs("pdf")} disabled={!!exporting}>{exporting === "pdf" ? "..." : "↓ PDF"}</button>
-              <button style={S.exportBtn} onClick={() => exportAs("docx")} disabled={!!exporting}>{exporting === "docx" ? "..." : "↓ Word"}</button>
-            </div>
+            <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate idea</button>
           </div>
           <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
           <UsageCounter usage={tab.usage} />
@@ -463,20 +556,19 @@ export default function Bento() {
   const handleSaveToFolder = (folderId, newName) => {
     const tab = showSaveModal;
     if (!tab?.idea) return;
-    setProjectData(prev => {
-      const cur = prev[activeProjectId] || data;
+    setData(cur => {
       let fid = folderId;
-      let newFolders = cur.folders;
-      if (newName) { fid = `folder-${Date.now()}`; newFolders = [...cur.folders, { id: fid, name: newName }]; }
-      return { ...prev, [activeProjectId]: { ...cur, folders: newFolders, savedIdeas: [...cur.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] } };
+      let updatedFolders = cur.folders;
+      if (newName) { fid = `folder-${Date.now()}`; updatedFolders = [...cur.folders, { id: fid, name: newName }]; }
+      return { folders: updatedFolders, savedIdeas: [...cur.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] };
     });
     setShowSaveModal(null);
   };
   const isIdeaSaved = (tab) => tab.idea ? data.savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic) : false;
-  const deleteIdea = (id) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, savedIdeas: cur.savedIdeas.filter(s => s.id !== id) } }; }); };
-  const deleteFolder = (id) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, folders: cur.folders.filter(f => f.id !== id), savedIdeas: cur.savedIdeas.filter(s => s.folderId !== id) } }; }); };
-  const moveIdea = (ideaId, fid) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, savedIdeas: cur.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) } }; }); };
-  const createFolder = (name) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, folders: [...cur.folders, { id: `folder-${Date.now()}`, name }] } }; }); };
+  const deleteIdea = (id) => { setData(cur => ({ savedIdeas: cur.savedIdeas.filter(s => s.id !== id) })); };
+  const deleteFolder = (id) => { setData(cur => ({ folders: cur.folders.filter(f => f.id !== id), savedIdeas: cur.savedIdeas.filter(s => s.folderId !== id) })); };
+  const moveIdea = (ideaId, fid) => { setData(cur => ({ savedIdeas: cur.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) })); };
+  const createFolder = (name) => { setData(cur => ({ folders: [...cur.folders, { id: `folder-${Date.now()}`, name }] })); };
 
   const setMoodBoards = (mb) => { setData({ moodBoards: mb }); };
 
@@ -545,7 +637,7 @@ export default function Bento() {
 
       {view === "saved" && (
         <main style={S.main}>
-          <SavedView savedIdeas={data.savedIdeas} folders={data.folders} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} onCreateFolder={createFolder} />
+          <SavedView savedIdeas={data.savedIdeas} folders={data.folders} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} onCreateFolder={createFolder} brand={proj.brand} />
         </main>
       )}
     </div>
@@ -610,7 +702,6 @@ const S = {
   results: { marginTop: 4 },
   resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
   resultsLabel: { fontSize: 15, color: "#78716C", margin: 0 },
-  resultsActions: { display: "flex", gap: 6, alignItems: "center" },
   regenerateBtn: { padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   exportBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", background: "#FFFEFB", border: "1.5px solid #DDD5CA", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   topicHighlight: { color: "#C07A8E", fontWeight: 700 },
@@ -689,6 +780,10 @@ const S = {
   folderDeleteBtn: { background: "none", border: "none", color: "#C4B9A8", fontSize: 10, cursor: "pointer", padding: 2, opacity: 0.5 },
   newFolderBtn: { padding: "10px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "none", border: "1.5px dashed #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginTop: 4 },
   savedContent: { display: "flex", flexDirection: "column", gap: 12 },
+  savedContentHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  savedContentTitle: { fontSize: 16, fontWeight: 800, color: "#1C1917", margin: 0 },
+  exportActions: { display: "flex", gap: 6 },
+  exportBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", background: "#FFFEFB", border: "1.5px solid #DDD5CA", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   savedCard: { background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 14, padding: "16px 20px", cursor: "pointer" },
   savedCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
   savedMeta: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },

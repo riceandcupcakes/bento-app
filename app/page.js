@@ -259,7 +259,29 @@ function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIde
    ══════════════════════════════════════════ */
 function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
   const resultsRef = useRef(null);
+  const [exporting, setExporting] = useState(null);
   const go = () => { if (tab.topic.trim() && project.brand.trim()) requestGenerate(tab.id, tab.topic, tab.platform, resultsRef); };
+
+  const exportAs = async (format) => {
+    if (!tab.idea) return;
+    setExporting(format);
+    try {
+      const res = await fetch(`/api/export/${format}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea: tab.idea, topic: tab.topic, platform: tab.platform, brand: project.brand }),
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bento-${tab.topic.replace(/[^a-zA-Z0-9]/g, "-").substring(0, 30)}.${format === "docx" ? "docx" : "pdf"}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) { console.error(err); alert("Export failed. Please try again."); }
+    finally { setExporting(null); }
+  };
+
   return (
     <div>
       <div style={S.inputCard}>
@@ -277,7 +299,11 @@ function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, reques
         <div ref={resultsRef} style={S.results}>
           <div style={S.resultsHeader}>
             <p style={S.resultsLabel}>Idea for <span style={S.topicHighlight}>"{tab.topic}"</span> on <span style={S.topicHighlight}>{tab.platform}</span></p>
-            <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate idea</button>
+            <div style={S.resultsActions}>
+              <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate</button>
+              <button style={S.exportBtn} onClick={() => exportAs("pdf")} disabled={!!exporting}>{exporting === "pdf" ? "..." : "↓ PDF"}</button>
+              <button style={S.exportBtn} onClick={() => exportAs("docx")} disabled={!!exporting}>{exporting === "docx" ? "..." : "↓ Word"}</button>
+            </div>
           </div>
           <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
           <UsageCounter usage={tab.usage} />
@@ -311,10 +337,16 @@ export default function Bento() {
   const data = projectData[activeProjectId] || { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} };
 
   // Helpers to update project data
-  const setData = (updates) => {
-    setProjectData(prev => ({ ...prev, [activeProjectId]: { ...data, ...updates } }));
+  const setData = (updatesOrFn) => {
+    setProjectData(prev => {
+      const cur = prev[activeProjectId] || { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} };
+      const updates = typeof updatesOrFn === "function" ? updatesOrFn(cur) : updatesOrFn;
+      return { ...prev, [activeProjectId]: { ...cur, ...updates } };
+    });
   };
-  const updateTab = (id, updates) => { setData({ tabs: data.tabs.map(t => t.id === id ? { ...t, ...updates } : t) }); };
+  const updateTab = (id, updates) => {
+    setData(cur => ({ tabs: cur.tabs.map(t => t.id === id ? { ...t, ...updates } : t) }));
+  };
 
   // ── Load ──
   useEffect(() => {
@@ -375,14 +407,24 @@ export default function Bento() {
   };
 
   // ── Tab actions ──
-  const addTab = () => { const t = newTab(); setData({ tabs: [...data.tabs, t] }); setActiveTabId(t.id); };
-  const closeTab = (id) => { if (data.tabs.length === 1) return; const idx = data.tabs.findIndex(t => t.id === id); const nt = data.tabs.filter(t => t.id !== id); setData({ tabs: nt }); if (activeTabId === id) setActiveTabId(nt[Math.max(0, idx - 1)].id); };
+  const addTab = () => {
+    const t = newTab();
+    setData(cur => ({ tabs: [...cur.tabs, t] }));
+    setActiveTabId(t.id);
+  };
+  const closeTab = (id) => {
+    if (data.tabs.length <= 1) return;
+    const idx = data.tabs.findIndex(t => t.id === id);
+    const remaining = data.tabs.filter(t => t.id !== id);
+    setData(cur => ({ tabs: cur.tabs.filter(t => t.id !== id) }));
+    if (activeTabId === id) setActiveTabId(remaining[Math.max(0, idx - 1)]?.id);
+  };
 
   // ── Generation ──
   const runGenerate = async (tabId, topic, platform, resultsRef) => {
     if (!proj) return;
     isGeneratingRef.current = true;
-    setData({ tabs: data.tabs.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null, usage: null } : t) });
+    setData(cur => ({ tabs: cur.tabs.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null, usage: null } : t) }));
     try {
       const response = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -412,25 +454,29 @@ export default function Bento() {
     if (isGeneratingRef.current) {
       queueRef.current = queueRef.current.filter(q => q.tabId !== tabId);
       queueRef.current.push({ tabId, topic, platform, resultsRef });
-      setData({ tabs: data.tabs.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null, usage: null } : t) });
+      setData(cur => ({ tabs: cur.tabs.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null, usage: null } : t) }));
     } else { runGenerate(tabId, topic, platform, resultsRef); }
   };
 
   // ── Save idea ──
   const onSaveIdea = (tab) => { setShowSaveModal(tab); };
   const handleSaveToFolder = (folderId, newName) => {
-    let fid = folderId;
-    if (newName) { fid = `folder-${Date.now()}`; setData({ folders: [...data.folders, { id: fid, name: newName }] }); }
     const tab = showSaveModal;
     if (!tab?.idea) return;
-    setData({ savedIdeas: [...data.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] });
+    setProjectData(prev => {
+      const cur = prev[activeProjectId] || data;
+      let fid = folderId;
+      let newFolders = cur.folders;
+      if (newName) { fid = `folder-${Date.now()}`; newFolders = [...cur.folders, { id: fid, name: newName }]; }
+      return { ...prev, [activeProjectId]: { ...cur, folders: newFolders, savedIdeas: [...cur.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] } };
+    });
     setShowSaveModal(null);
   };
   const isIdeaSaved = (tab) => tab.idea ? data.savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic) : false;
-  const deleteIdea = (id) => { setData({ savedIdeas: data.savedIdeas.filter(s => s.id !== id) }); };
-  const deleteFolder = (id) => { setData({ folders: data.folders.filter(f => f.id !== id), savedIdeas: data.savedIdeas.filter(s => s.folderId !== id) }); };
-  const moveIdea = (ideaId, fid) => { setData({ savedIdeas: data.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) }); };
-  const createFolder = (name) => { setData({ folders: [...data.folders, { id: `folder-${Date.now()}`, name }] }); };
+  const deleteIdea = (id) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, savedIdeas: cur.savedIdeas.filter(s => s.id !== id) } }; }); };
+  const deleteFolder = (id) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, folders: cur.folders.filter(f => f.id !== id), savedIdeas: cur.savedIdeas.filter(s => s.folderId !== id) } }; }); };
+  const moveIdea = (ideaId, fid) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, savedIdeas: cur.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) } }; }); };
+  const createFolder = (name) => { setProjectData(prev => { const cur = prev[activeProjectId] || data; return { ...prev, [activeProjectId]: { ...cur, folders: [...cur.folders, { id: `folder-${Date.now()}`, name }] } }; }); };
 
   const setMoodBoards = (mb) => { setData({ moodBoards: mb }); };
 
@@ -447,7 +493,7 @@ export default function Bento() {
   return (
     <div style={S.app}>
       {showSettings && <SettingsModal project={proj} onSave={updateProject} onClose={() => setShowSettings(false)} />}
-      {showSaveModal && <SaveToFolderModal folders={data.folders.map(f => ({ ...f, count: data.savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
+      {showSaveModal && <SaveToFolderModal key={`save-${showSaveModal.id}`} folders={data.folders.map(f => ({ ...f, count: data.savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
 
       <header style={S.header}>
         <div style={{ ...S.headerLeft, cursor: "pointer" }} onClick={() => { setView("generate"); setShowProjectMenu(false); }}>
@@ -460,7 +506,8 @@ export default function Bento() {
             <button style={S.projectBtn} onClick={() => setShowProjectMenu(!showProjectMenu)}>
               {proj.name} ▾
             </button>
-            {showProjectMenu && (
+            {showProjectMenu && <>
+              <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 }} onClick={() => setShowProjectMenu(false)} />
               <div style={S.projectMenu}>
                 {projects.map(p => (
                   <div key={p.id} style={{ ...S.projectMenuItem, ...(p.id === activeProjectId ? S.projectMenuItemActive : {}) }} onClick={() => { setActiveProjectId(p.id); setShowProjectMenu(false); setView("generate"); }}>
@@ -471,11 +518,11 @@ export default function Bento() {
                 <div style={S.projectMenuDivider} />
                 <div style={S.projectMenuItem} onClick={() => { setCreatingProject(true); setShowProjectMenu(false); }}>+ New project</div>
               </div>
-            )}
+            </>}
           </div>
-          <button style={{ ...S.viewToggle, ...(view === "generate" ? S.viewToggleActive : {}) }} onClick={() => setView("generate")}>Generate</button>
-          <button style={{ ...S.viewToggle, ...(view === "saved" ? S.viewToggleActive : {}) }} onClick={() => setView("saved")}>Saved{data.savedIdeas.length > 0 ? ` (${data.savedIdeas.length})` : ""}</button>
-          <button style={S.settingsBtn} onClick={() => setShowSettings(true)}>⚙</button>
+          <button style={{ ...S.viewToggle, ...(view === "generate" ? S.viewToggleActive : {}) }} onClick={() => { setView("generate"); setShowProjectMenu(false); }}>Generate</button>
+          <button style={{ ...S.viewToggle, ...(view === "saved" ? S.viewToggleActive : {}) }} onClick={() => { setView("saved"); setShowProjectMenu(false); }}>Saved{data.savedIdeas.length > 0 ? ` (${data.savedIdeas.length})` : ""}</button>
+          <button style={S.settingsBtn} onClick={() => { setShowSettings(true); setShowProjectMenu(false); }}>⚙</button>
         </div>
       </header>
 
@@ -523,7 +570,7 @@ const S = {
   headerLeft: { display: "flex", alignItems: "center", gap: 10 },
   headerBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, width: 22, height: 22, borderRadius: 4, overflow: "hidden" },
   hbCell: { borderRadius: 2 }, headerName: { fontSize: 18, fontWeight: 800, letterSpacing: "-0.03em" },
-  headerRight: { display: "flex", alignItems: "center", gap: 6 },
+  headerRight: { display: "flex", alignItems: "center", gap: 6, position: "relative", zIndex: 51 },
   settingsBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", cursor: "pointer", fontFamily: "inherit" },
   projectBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, color: "#1C1917", cursor: "pointer", fontFamily: "inherit" },
   projectMenu: { position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.1)", minWidth: 200, zIndex: 50, overflow: "hidden" },
@@ -563,7 +610,9 @@ const S = {
   results: { marginTop: 4 },
   resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
   resultsLabel: { fontSize: 15, color: "#78716C", margin: 0 },
+  resultsActions: { display: "flex", gap: 6, alignItems: "center" },
   regenerateBtn: { padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  exportBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", background: "#FFFEFB", border: "1.5px solid #DDD5CA", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   topicHighlight: { color: "#C07A8E", fontWeight: 700 },
   bentoBox: { border: "1.5px solid #E8E2D9", borderRadius: 18, overflow: "hidden", marginBottom: 20, background: "#FFF", boxShadow: "0 2px 16px rgba(0,0,0,0.03)" },
   bentoTop: { padding: "22px 28px 18px", borderBottom: "1px solid #E8E2D9" },

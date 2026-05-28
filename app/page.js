@@ -1,800 +1,262 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 
 const PLATFORMS = ["Instagram", "TikTok", "LinkedIn", "Blog", "Twitter"];
-const ACCENT_SETS = [
-  { bg: "#FFF4F2", border: "#D4857A", tag: "#D4857A", tagBg: "#FFE9E5" },
-  { bg: "#F8F1FB", border: "#9B72AA", tag: "#9B72AA", tagBg: "#F0E4F6" },
-  { bg: "#F1F7F3", border: "#6B937A", tag: "#6B937A", tagBg: "#E1EDE5" },
-];
-
-/* ══════════════════════════════════════════
-   Storage
-   ══════════════════════════════════════════ */
-function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
-function load(key, fb) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch { return fb; } }
-
-/* ══════════════════════════════════════════
-   Display Components
-   ══════════════════════════════════════════ */
-function ResearchPoint({ text }) {
-  return <span>{(text || "").split(/(<key>.*?<\/key>)/g).map((p, i) => p.startsWith("<key>") ? <span key={i} style={S.keyHighlight}>{p.replace(/<\/?key>/g, "")}</span> : <span key={i}>{p}</span>)}</span>;
-}
-
-function SourceLink({ source }) {
-  const m = (source || "").match(/(https?:\/\/[^\s)]+)/);
-  if (m) { const u = m[1], l = source.replace(u, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(), s = u.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return <span style={S.sourceText}>{l && <>{l} — </>}<a href={u} target="_blank" rel="noopener noreferrer" style={S.sourceLink}>{s}</a></span>; }
-  return <span style={S.sourceText}>{source}</span>;
-}
-
-function BriefContent({ content }) {
-  const lines = (content || "").split(/\n|(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway):)/gi);
-  const parsed = []; let cur = null;
-  for (const l of lines) { const m = l.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway)\s*:\s*(.*)/i); if (m) { if (cur) parsed.push(cur); cur = { label: m[1], text: m[2].trim() }; } else if (l.trim()) { if (cur) cur.text += " " + l.trim(); else parsed.push({ label: null, text: l.trim() }); } }
-  if (cur) parsed.push(cur);
-  if (parsed.some(p => p.label)) return <div style={S.briefStructured}>{parsed.map((p, i) => <div key={i} style={S.briefLine}>{p.label && <span style={S.briefLabel}>{p.label}:</span>}<span style={S.briefValue}>{p.text}</span></div>)}</div>;
-  return <p style={S.stepContent}>{content}</p>;
-}
-
-function BulletedText({ text }) {
-  if (!text) return null;
-  const bullets = text.split("•").map(s => s.trim()).filter(Boolean);
-  if (bullets.length <= 1) return <p style={S.vdText}>{text}</p>;
-  return <div style={S.bulletList}>{bullets.map((b, i) => <div key={i} style={S.bulletItem}><span style={S.bulletDot}/><span style={S.bulletText}>{b}</span></div>)}</div>;
-}
-
-function VisualDirection({ vd }) {
-  if (!vd) return null;
-  const refs = vd.references || vd.reference_accounts || [];
-  const hasUrls = refs.some(r => r.handle && r.handle.match(/https?:\/\//));
-  return (
-    <div style={S.vdSection}>
-      <div style={S.compartmentLabel}><span>🎨</span> Visual Direction</div>
-      <div style={S.vdGrid}>
-        <div style={S.vdCard}><div style={S.vdCardLabel}>Mood</div><p style={S.vdMood}>{vd.mood}</p></div>
-        <div style={S.vdCard}><div style={S.vdCardLabel}>Layout</div><BulletedText text={vd.layout} /></div>
-        <div style={S.vdCard}><div style={S.vdCardLabel}>Creative Concept</div><BulletedText text={vd.creative_concept || vd.imagery_and_icons} /></div>
-        {refs.length > 0 && <div style={S.vdCard}><div style={S.vdCardLabel}>{hasUrls ? "Reference articles" : "Study these accounts"}</div><div style={S.refList}>{refs.map((r, i) => {
-          const um = r.handle && r.handle.match(/(https?:\/\/[^\s]+)/);
-          if (um) { const url = um[1], label = r.handle.replace(url, "").replace(/[—\-–]\s*$/, "").replace(/\s*[—\-–]\s*/, "").trim(), short = url.replace(/^https?:\/\/(www\.)?/, "").split("/").slice(0, 2).join("/"); return <div key={i} style={S.refItem}><a href={url} target="_blank" rel="noopener noreferrer" style={S.refLink}>{label || short}</a><span style={S.refNote}>{r.note}</span></div>; }
-          return <div key={i} style={S.refItem}><span style={S.refHandle}>{r.handle}</span><span style={S.refNote}>{r.note}</span></div>;
-        })}</div></div>}
-      </div>
-    </div>
-  );
-}
-
-function MoodBoard({ boardKey, moodBoards, setMoodBoards }) {
-  const [url, setUrl] = useState(""); const [note, setNote] = useState("");
-  const boards = moodBoards[boardKey] || [];
-  const add = () => { if (!url.trim()) return; const n = { ...moodBoards }; if (!n[boardKey]) n[boardKey] = []; n[boardKey] = [...n[boardKey], { url: url.trim(), note: note.trim() }]; setMoodBoards(n); setUrl(""); setNote(""); };
-  const remove = (idx) => { const n = { ...moodBoards }; n[boardKey] = n[boardKey].filter((_, i) => i !== idx); setMoodBoards(n); };
-  const domain = (u) => { try { return u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]; } catch { return "link"; } };
-  return (
-    <div style={S.moodSection}>
-      <div style={S.compartmentLabel}><span>📌</span> My Mood Board</div>
-      {boards.length > 0 && <div style={S.moodGrid}>{boards.map((item, i) => <div key={i} style={S.moodItem}><div style={S.moodItemTop}><a href={item.url} target="_blank" rel="noopener noreferrer" style={S.moodLink}>{domain(item.url)} ↗</a><button style={S.moodRemove} onClick={() => remove(i)}>✕</button></div>{item.note && <span style={S.moodNote}>{item.note}</span>}</div>)}</div>}
-      <div style={S.moodInput}>
-        <input style={{ ...S.textInput, flex: 2 }} value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a link..." onKeyDown={e => { if (e.key === "Enter") add(); }} />
-        <input style={{ ...S.textInput, flex: 1.5 }} value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" onKeyDown={e => { if (e.key === "Enter") add(); }} />
-        <button style={S.moodAddBtn} onClick={add}>+ Add</button>
-      </div>
-    </div>
-  );
-}
-
-function IdeaCard({ idea, index, boardKey, moodBoards, setMoodBoards, onSave, isSaved }) {
-  const c = ACCENT_SETS[index % 3];
-  return (
-    <div style={{ ...S.bentoBox, borderColor: c.border }}>
-      <div style={{ ...S.bentoTop, background: c.bg }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div><div style={{ ...S.formatTag, background: c.tagBg, color: c.tag }}>{idea.format}</div><h3 style={S.angleTitle}>{idea.angle}</h3></div>
-          {onSave && <button style={isSaved ? S.savedBtnDone : S.saveBtn} onClick={onSave} disabled={isSaved}>{isSaved ? "✓ Saved" : "Save"}</button>}
-        </div>
-      </div>
-      <div style={S.bentoGrid}>
-        <div style={S.bentoLeft}><div style={S.compartmentLabel}><span>🔬</span> Research</div><div style={S.researchStack}>{(idea.research || []).map((r, i) => <div key={i} style={S.researchCard}><p style={S.researchText}><ResearchPoint text={r.point} /></p><SourceLink source={r.source} /></div>)}</div></div>
-        <div style={S.bentoRight}><div style={S.compartmentLabel}><span>📋</span> Content Brief</div><div style={S.briefStack}>{(idea.brief || []).map((b, i) => <div key={i} style={S.briefStep}><div style={{ ...S.stepLabel, color: c.tag, background: c.tagBg }}>{b.step}</div><BriefContent content={b.content} /></div>)}</div></div>
-      </div>
-      <VisualDirection vd={idea.visual_direction} />
-      <MoodBoard boardKey={boardKey} moodBoards={moodBoards} setMoodBoards={setMoodBoards} />
-      <div style={{ ...S.bentoBottom, borderTopColor: c.border }}><span style={S.whyLabel}>✨ Why this works</span><p style={S.whyText}>{idea.why}</p></div>
-    </div>
-  );
-}
-
-function LoadingState() {
-  const msgs = ["Researching the topic...", "Crafting your content brief...", "Building visual direction...", "Packing your bento..."];
-  const [i, setI] = useState(0);
-  useEffect(() => { const t = setInterval(() => setI(n => (n + 1) % msgs.length), 2500); return () => clearInterval(t); }, []);
-  return <div style={S.loadingWrap}><div style={S.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...S.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div><p style={S.loadingMsg}>{msgs[i]}</p></div>;
-}
-
-function UsageCounter({ usage }) {
-  if (!usage) return null;
-  return <div style={S.usageBar}><span style={S.usageItem}>Tokens: {(usage.input_tokens + usage.output_tokens).toLocaleString()}</span><span style={S.usageDot}>·</span><span style={S.usageItem}>Cost: ${usage.cost}</span></div>;
-}
-
-/* ══════════════════════════════════════════
-   Modals
-   ══════════════════════════════════════════ */
-function SettingsModal({ project, onSave, onClose }) {
-  const [db, setDb] = useState(project.brand); const [da, setDa] = useState(project.audience); const [dt, setDt] = useState(project.tone);
-  const [ds, setDs] = useState(project.brandStyle || ""); const [dn, setDn] = useState(project.name);
-  const [dc, setDc] = useState(() => { const a = [...(project.competitors || [])]; while (a.length < 3) a.push(""); return a; });
-  const uc = (i, v) => { const n = [...dc]; n[i] = v; setDc(n); };
-  return (
-    <div style={S.modalOverlay} onClick={onClose}><div style={S.modal} onClick={e => e.stopPropagation()}>
-      <div style={S.modalHeader}><h2 style={S.modalTitle}>Project Settings</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Project Name</label><input style={S.textInput} value={dn} onChange={e => setDn(e.target.value)} placeholder="e.g., hers, Brand Y" /></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Brand</label><p style={S.settingsHint}>Brand name or URL.</p><input style={S.textInput} value={db} onChange={e => setDb(e.target.value)} placeholder="https://www.forhers.com/" /></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Target Audience</label><textarea style={S.brandTextarea} value={da} onChange={e => setDa(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Tone of Voice</label><input style={S.textInput} value={dt} onChange={e => setDt(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Brand Visual Style</label><p style={S.settingsHint}>Describe your brand's visual identity.</p><textarea style={S.brandTextarea} value={ds} onChange={e => setDs(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones..."' rows={2} /></div>
-      <div style={S.settingsSection}><label style={S.settingsLabel}>Competitors <span style={S.optionalTag}>optional — up to 3</span></label>{dc.map((c, i) => <input key={i} style={{ ...S.textInput, marginBottom: 8 }} value={c} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
-        <button style={{ ...S.primaryBtn, opacity: db.trim() && da.trim() && dt.trim() && dn.trim() ? 1 : 0.4 }} onClick={() => { if (db.trim() && da.trim() && dt.trim() && dn.trim()) { onSave({ ...project, name: dn.trim(), brand: db.trim(), audience: da.trim(), tone: dt.trim(), brandStyle: ds.trim(), competitors: dc.filter(c => c.trim()) }); onClose(); } }}>Save</button>
-      </div>
-    </div></div>
-  );
-}
-
-function SaveToFolderModal({ folders, onSave, onClose }) {
-  const [sel, setSel] = useState(folders[0]?.id || ""); const [newName, setNewName] = useState(""); const [showNew, setShowNew] = useState(false);
-  return (
-    <div style={S.modalOverlay} onClick={onClose}><div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-      <div style={S.modalHeader}><h2 style={S.modalTitle}>Save to folder</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
-      {folders.length > 0 && !showNew && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>{folders.map(f => <div key={f.id} style={{ ...S.folderOption, ...(sel === f.id ? S.folderOptionActive : {}) }} onClick={() => setSel(f.id)}><span>📁 {f.name}</span><span style={S.folderCount}>{f.count || 0}</span></div>)}</div>}
-      {showNew ? <div style={{ marginBottom: 16 }}><input style={S.textInput} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && newName.trim()) onSave(null, newName.trim()); }} /></div> : <button style={{ ...S.secondaryBtn, width: "100%", marginBottom: 16 }} onClick={() => setShowNew(true)}>+ New folder</button>}
-      <div style={{ display: "flex", gap: 10 }}>
-        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
-        <button style={{ ...S.primaryBtn, opacity: (showNew ? newName.trim() : sel) ? 1 : 0.4 }} onClick={() => { if (showNew && newName.trim()) onSave(null, newName.trim()); else if (sel) onSave(sel, null); }}>Save</button>
-      </div>
-    </div></div>
-  );
-}
-
-function NewFolderModal({ onSave, onClose }) {
-  const [name, setName] = useState("");
-  return (
-    <div style={S.modalOverlay} onClick={onClose}><div style={{ ...S.modal, maxWidth: 380 }} onClick={e => e.stopPropagation()}>
-      <div style={S.modalHeader}><h2 style={S.modalTitle}>New folder</h2><button style={S.closeBtn} onClick={onClose}>✕</button></div>
-      <input style={S.textInput} value={name} onChange={e => setName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e => { if (e.key === "Enter" && name.trim()) { onSave(name.trim()); onClose(); } }} />
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <button style={S.secondaryBtn} onClick={onClose}>Cancel</button>
-        <button style={{ ...S.primaryBtn, opacity: name.trim() ? 1 : 0.4 }} onClick={() => { if (name.trim()) { onSave(name.trim()); onClose(); } }}>Create</button>
-      </div>
-    </div></div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Project Setup (onboarding for new project)
-   ══════════════════════════════════════════ */
-function ProjectSetup({ onComplete, isFirst }) {
-  const [n, setN] = useState(""); const [b, setB] = useState(""); const [a, setA] = useState(""); const [t, setT] = useState(""); const [s, setS] = useState("");
-  const [c, setC] = useState(["", "", ""]);
-  const uc = (i, v) => { const arr = [...c]; arr[i] = v; setC(arr); };
-  const ok = n.trim() && b.trim() && a.trim() && t.trim();
-  return (
-    <div style={S.onboarding}><div style={S.onboardingCard}>
-      <div style={S.onboardingBento}><div style={S.obCell1}/><div style={S.obCell2}/><div style={S.obCell3}/><div style={S.obCell4}/></div>
-      <h1 style={S.obTitle}>{isFirst ? "Bento" : "New Project"}</h1>
-      <p style={S.obSub}>{isFirst ? "Content ideas, neatly packed." : "Set up a new brand workspace."}</p>
-      <div style={S.obSection}><label style={S.obLabel}>Project Name</label><input style={S.textInput} value={n} onChange={e => setN(e.target.value)} placeholder='e.g., "hers" or "Brand Y"' /></div>
-      <div style={S.obSection}><label style={S.obLabel}>Brand</label><p style={S.obHint}>Brand name or website URL.</p><input style={S.textInput} value={b} onChange={e => setB(e.target.value)} placeholder="https://www.forhers.com/" /></div>
-      <div style={S.obSection}><label style={S.obLabel}>Target Audience</label><textarea style={S.brandTextarea} value={a} onChange={e => setA(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2} /></div>
-      <div style={S.obSection}><label style={S.obLabel}>Tone of Voice</label><input style={S.textInput} value={t} onChange={e => setT(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy" /></div>
-      <div style={S.obSection}><label style={S.obLabel}>Brand Visual Style <span style={S.optionalTag}>optional</span></label><textarea style={S.brandTextarea} value={s} onChange={e => setS(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones..."' rows={2} /></div>
-      <div style={S.obSection}><label style={S.obLabel}>Competitors <span style={S.optionalTag}>optional — up to 3</span></label>{c.map((v, i) => <input key={i} style={{ ...S.textInput, marginBottom: 8 }} value={v} onChange={e => uc(i, e.target.value)} placeholder={`Competitor ${i + 1}`} />)}</div>
-      <button style={{ ...S.primaryBtn, marginTop: 16, width: "100%", opacity: ok ? 1 : 0.4 }} onClick={() => { if (ok) onComplete({ name: n.trim(), brand: b.trim(), audience: a.trim(), tone: t.trim(), brandStyle: s.trim(), competitors: c.filter(v => v.trim()) }); }}>{isFirst ? "Get started →" : "Create project →"}</button>
-    </div></div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Export helpers
-   ══════════════════════════════════════════ */
-function buildPrintHtml(ideas, folderName) {
-  const clean = (t) => (t || "").replace(/<\/?key>/g, "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const bullets = (t) => (t || "").split("•").filter(Boolean).map(b => `<li>${clean(b.trim())}</li>`).join("");
-
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${folderName} — Bento Export</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; color: #1C1917; padding: 40px; font-size: 11pt; line-height: 1.6; }
-  .idea { page-break-after: always; margin-bottom: 40px; }
-  .idea:last-child { page-break-after: auto; }
-  .header { border-bottom: 2px solid #C07A8E; padding-bottom: 12px; margin-bottom: 20px; }
-  .header h1 { font-size: 10pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
-  .header .meta { font-size: 9pt; color: #A39888; margin-top: 4px; }
-  .format { font-size: 9pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
-  .angle { font-size: 18pt; font-weight: 800; margin-bottom: 20px; line-height: 1.25; }
-  .section-title { font-size: 9pt; color: #C07A8E; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 24px 0 12px; }
-  .research-item { background: #FAF8F5; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #EDE8DF; }
-  .research-item p { font-size: 10pt; color: #44403C; margin-bottom: 4px; }
-  .research-item .source { font-size: 8pt; color: #A39888; font-style: italic; }
-  .brief-step { margin-bottom: 12px; }
-  .step-label { display: inline-block; font-size: 8pt; font-weight: 700; color: #C07A8E; background: #FFF4F2; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; }
-  .brief-line { font-size: 10pt; color: #44403C; margin-bottom: 2px; }
-  .brief-line strong { color: #1C1917; }
-  .vd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .vd-card { background: #FAF8F5; border-radius: 6px; padding: 12px; border: 1px solid #EDE8DF; }
-  .vd-label { font-size: 8pt; color: #A39888; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
-  .vd-mood { font-size: 13pt; font-weight: 700; }
-  .vd-card ul { padding-left: 16px; font-size: 10pt; color: #44403C; }
-  .vd-card li { margin-bottom: 4px; }
-  .ref-handle { font-size: 10pt; font-weight: 700; color: #C07A8E; }
-  .ref-note { font-size: 9pt; color: #78716C; font-style: italic; }
-  .why { font-size: 10pt; color: #44403C; margin-top: 8px; }
-  .divider { border: none; border-top: 1px solid #E8E2D9; margin: 20px 0; }
-  @media print { body { padding: 20px; } .idea { page-break-after: always; } }
-</style></head><body>
-${ideas.map((saved, idx) => {
-    const idea = saved.idea;
-    const vd = idea.visual_direction || {};
-    const refs = vd.references || vd.reference_accounts || [];
-    const briefContent = (content) => {
-      return (content || "").split(/(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):)/gi)
-        .map(line => { const m = line.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):\s*(.*)/is); return m ? `<div class="brief-line"><strong>${m[1]}:</strong> ${clean(m[2].trim())}</div>` : line.trim() ? `<div class="brief-line">${clean(line.trim())}</div>` : ""; }).join("");
-    };
-    return `<div class="idea">
-      <div class="header"><h1>Bento</h1><div class="meta">${saved.platform} · ${clean(saved.topic)}</div></div>
-      <div class="format">${clean(idea.format)}</div>
-      <div class="angle">${clean(idea.angle)}</div>
-      <div class="section-title">🔬 Research</div>
-      ${(idea.research || []).map(r => `<div class="research-item"><p>${clean(r.point)}</p><div class="source">${clean(r.source)}</div></div>`).join("")}
-      <hr class="divider">
-      <div class="section-title">📋 Content Brief</div>
-      ${(idea.brief || []).map(b => `<div class="brief-step"><div class="step-label">${clean(b.step)}</div>${briefContent(b.content)}</div>`).join("")}
-      <hr class="divider">
-      <div class="section-title">🎨 Visual Direction</div>
-      <div class="vd-grid">
-        ${vd.mood ? `<div class="vd-card"><div class="vd-label">Mood</div><div class="vd-mood">${clean(vd.mood)}</div></div>` : ""}
-        ${vd.layout ? `<div class="vd-card"><div class="vd-label">Layout</div><ul>${bullets(vd.layout)}</ul></div>` : ""}
-        ${(vd.creative_concept || vd.imagery_and_icons) ? `<div class="vd-card"><div class="vd-label">Creative Concept</div><ul>${bullets(vd.creative_concept || vd.imagery_and_icons)}</ul></div>` : ""}
-        ${refs.length > 0 ? `<div class="vd-card"><div class="vd-label">${refs.some(r => r.handle?.includes("http")) ? "Reference Articles" : "Study These Accounts"}</div>${refs.map(r => `<div><span class="ref-handle">${clean(r.handle)}</span><br><span class="ref-note">${clean(r.note)}</span></div>`).join("")}</div>` : ""}
-      </div>
-      <hr class="divider">
-      <div class="section-title">✨ Why This Works</div>
-      <div class="why">${clean(idea.why)}</div>
-    </div>`;
-  }).join("")}
-</body></html>`;
-}
-
-function exportPdf(ideas, folderName) {
-  const html = buildPrintHtml(ideas, folderName);
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => w.print(), 500);
-}
-
-async function exportDocx(ideas, folderName, brand) {
-  try {
-    const res = await fetch("/api/export/docx", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ideas: ideas.map(s => ({ idea: s.idea, topic: s.topic, platform: s.platform })), folderName, brand }),
-    });
-    if (!res.ok) throw new Error("Export failed");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${folderName.replace(/[^a-zA-Z0-9]/g, "-")}.docx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (err) { console.error(err); alert("Export failed. Please try again."); }
-}
-
-/* ══════════════════════════════════════════
-   Saved View
-   ══════════════════════════════════════════ */
-function SavedView({ savedIdeas, folders, moodBoards, setMoodBoards, onDeleteIdea, onDeleteFolder, onMoveIdea, onCreateFolder, brand }) {
-  const [activeFolder, setActiveFolder] = useState("all");
-  const filtered = activeFolder === "all" ? savedIdeas : savedIdeas.filter(s => s.folderId === activeFolder);
-  const [expandedId, setExpandedId] = useState(null);
-  const [movingId, setMovingId] = useState(null);
-  const [showNewFolder, setShowNewFolder] = useState(false);
-  const [exporting, setExporting] = useState(null);
-  const activeFolderName = activeFolder === "all" ? "All Saved" : (folders.find(f => f.id === activeFolder)?.name || "Folder");
-
-  const handleExport = async (format) => {
-    if (filtered.length === 0) return;
-    setExporting(format);
-    try {
-      if (format === "pdf") exportPdf(filtered, activeFolderName);
-      else await exportDocx(filtered, activeFolderName, brand);
-    } catch (err) { console.error(err); }
-    finally { setExporting(null); }
-  };
-
-  return (
-    <>
-      {showNewFolder && <NewFolderModal onSave={(name) => { onCreateFolder(name); setShowNewFolder(false); }} onClose={() => setShowNewFolder(false)} />}
-      <div style={S.savedLayout}>
-        <div style={S.savedSidebar}>
-          <div style={{ ...S.folderItem, ...(activeFolder === "all" ? S.folderItemActive : {}) }} onClick={() => setActiveFolder("all")}>
-            <span>📋 All Saved</span><span style={S.folderCount}>{savedIdeas.length}</span>
-          </div>
-          {folders.map(f => (
-            <div key={f.id} style={{ ...S.folderItem, ...(activeFolder === f.id ? S.folderItemActive : {}) }} onClick={() => setActiveFolder(f.id)}>
-              <span>📁 {f.name}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={S.folderCount}>{savedIdeas.filter(s => s.folderId === f.id).length}</span>
-                <button style={S.folderDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm(`Delete folder "${f.name}" and all ideas in it?`)) onDeleteFolder(f.id); }}>✕</button>
-              </div>
-            </div>
-          ))}
-          <button style={S.newFolderBtn} onClick={() => setShowNewFolder(true)}>+ New folder</button>
-        </div>
-        <div style={S.savedContent}>
-          {filtered.length > 0 && (
-            <div style={S.savedContentHeader}>
-              <h3 style={S.savedContentTitle}>{activeFolderName}</h3>
-              <div style={S.exportActions}>
-                <button style={S.exportBtn} onClick={() => handleExport("pdf")} disabled={!!exporting}>{exporting === "pdf" ? "Exporting..." : "↓ Export PDF"}</button>
-                <button style={S.exportBtn} onClick={() => handleExport("docx")} disabled={!!exporting}>{exporting === "docx" ? "Exporting..." : "↓ Export Word"}</button>
-              </div>
-            </div>
-          )}
-          {filtered.length === 0 && <div style={S.empty}><p style={S.emptyText}>{activeFolder === "all" ? "No saved ideas yet. Generate an idea and save it!" : "This folder is empty."}</p></div>}
-          {filtered.map(saved => (
-            <div key={saved.id} style={S.savedCard}>
-              <div style={S.savedCardHeader} onClick={() => setExpandedId(expandedId === saved.id ? null : saved.id)}>
-                <div>
-                  <div style={S.savedMeta}><span style={S.savedPlatform}>{saved.platform}</span><span style={S.savedTopic}>{saved.topic}</span><span style={S.savedDate}>{new Date(saved.savedAt).toLocaleDateString()}</span></div>
-                  <h4 style={S.savedAngle}>{saved.idea.angle}</h4>
-                  <span style={S.savedFormat}>{saved.idea.format}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button style={S.savedMoveBtn} onClick={e => { e.stopPropagation(); setMovingId(movingId === saved.id ? null : saved.id); }}>Move</button>
-                  <button style={S.savedDeleteBtn} onClick={e => { e.stopPropagation(); if (window.confirm("Delete this saved idea?")) onDeleteIdea(saved.id); }}>Delete</button>
-                  <span style={{ color: "#C4B9A8", fontSize: 14 }}>{expandedId === saved.id ? "▲" : "▼"}</span>
-                </div>
-              </div>
-              {movingId === saved.id && (
-                <div style={S.moveDropdown}>
-                  {folders.filter(f => f.id !== saved.folderId).map(f => <div key={f.id} style={S.moveOption} onClick={e => { e.stopPropagation(); onMoveIdea(saved.id, f.id); setMovingId(null); }}>📁 {f.name}</div>)}
-                  {folders.filter(f => f.id !== saved.folderId).length === 0 && <div style={S.moveOptionEmpty}>No other folders</div>}
-                </div>
-              )}
-              {expandedId === saved.id && <div style={{ paddingTop: 12 }}><IdeaCard idea={saved.idea} index={0} boardKey={`saved-${saved.id}`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} /></div>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Tab Content
-   ══════════════════════════════════════════ */
-function TabContent({ tab, project, moodBoards, setMoodBoards, updateTab, requestGenerate, onSaveIdea, isIdeaSaved }) {
-  const resultsRef = useRef(null);
-  const go = () => { if (tab.topic.trim() && project.brand.trim()) requestGenerate(tab.id, tab.topic, tab.platform, resultsRef); };
-  return (
-    <div>
-      <div style={S.inputCard}>
-        <div style={S.inputGrid}>
-          <div style={S.topicCol}><label style={S.inputLabel}>Topic or keyword</label><input style={S.textInput} value={tab.topic} onChange={e => updateTab(tab.id, { topic: e.target.value })} placeholder="foods for weight management" onKeyDown={e => { if (e.key === "Enter") go(); }} /></div>
-          <div style={S.platformCol}><label style={S.inputLabel}>Platform</label><select style={S.selectInput} value={tab.platform} onChange={e => updateTab(tab.id, { platform: e.target.value })}>{PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-          <div style={S.btnCol}><button style={{ ...S.generateBtn, opacity: tab.topic.trim() && !tab.loading ? 1 : 0.4 }} onClick={go} disabled={!tab.topic.trim() || tab.loading}>{tab.loading ? "Packing..." : "Pack my bento 🍱"}</button></div>
-        </div>
-        {(project.competitors || []).length > 0 && <div style={S.activeComps}><span style={S.activeCompsLabel}>Analyzing:</span>{project.competitors.map((c, i) => <span key={i} style={S.compChip}>{c}</span>)}</div>}
-      </div>
-      {tab.queued && <div style={S.queuedWrap}><p style={S.queuedText}>⏳ Waiting for other tab to finish...</p><p style={S.queuedSub}>Your request is queued and will start automatically.</p></div>}
-      {tab.loading && !tab.queued && <LoadingState />}
-      {tab.error && <div style={S.errorBox}>{tab.error}</div>}
-      {tab.idea && (
-        <div ref={resultsRef} style={S.results}>
-          <div style={S.resultsHeader}>
-            <p style={S.resultsLabel}>Idea for <span style={S.topicHighlight}>"{tab.topic}"</span> on <span style={S.topicHighlight}>{tab.platform}</span></p>
-            <button style={S.regenerateBtn} onClick={go} disabled={tab.loading}>↻ Regenerate idea</button>
-          </div>
-          <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={() => onSaveIdea(tab)} isSaved={isIdeaSaved(tab)} />
-          <UsageCounter usage={tab.usage} />
-        </div>
-      )}
-      {!tab.loading && !tab.idea && !tab.error && <div style={S.empty}><div style={S.emptyBento}><div style={{ ...S.emptyCell, opacity: 0.15 }} /><div style={{ ...S.emptyCell, opacity: 0.1 }} /><div style={{ ...S.emptyCell, opacity: 0.08 }} /><div style={{ ...S.emptyCell, opacity: 0.05 }} /></div><p style={S.emptyText}>Your bento is empty. Enter a topic to start packing.</p></div>}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Main App
-   ══════════════════════════════════════════ */
-let tabCounter = 1;
-const newTab = () => ({ id: `tab-${tabCounter++}`, name: "New", topic: "", platform: "Instagram", idea: null, usage: null, loading: false, queued: false, error: null });
-
-export default function Bento() {
-  const [projects, setProjects] = useState([]);
-  const [activeProjectId, setActiveProjectId] = useState(null);
-  const [projectData, setProjectData] = useState({}); // { [projId]: { tabs, savedIdeas, folders, moodBoards } }
-  const [view, setView] = useState("generate");
-  const [showSettings, setShowSettings] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(null);
-  const [showProjectMenu, setShowProjectMenu] = useState(false);
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  const isGeneratingRef = useRef(false);
-  const queueRef = useRef([]);
-
-  const proj = projects.find(p => p.id === activeProjectId);
-  const data = projectData[activeProjectId] || { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} };
-
-  // Helpers to update project data
-  const setData = (updatesOrFn) => {
-    setProjectData(prev => {
-      const cur = prev[activeProjectId] || { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} };
-      const updates = typeof updatesOrFn === "function" ? updatesOrFn(cur) : updatesOrFn;
-      return { ...prev, [activeProjectId]: { ...cur, ...updates } };
-    });
-  };
-  const updateTab = (id, updates) => {
-    setData(cur => ({ tabs: cur.tabs.map(t => t.id === id ? { ...t, ...updates } : t) }));
-  };
-
-  // ── Load ──
-  useEffect(() => {
-    const ps = load("bento_projects", []);
-    const apId = load("bento_active_project", null);
-    const pd = {};
-    for (const p of ps) {
-      pd[p.id] = load(`bento_data_${p.id}`, { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} });
-      // Clear loading states
-      if (pd[p.id].tabs) pd[p.id].tabs = pd[p.id].tabs.map(t => ({ ...t, loading: false, queued: false, error: null }));
-      // Restore tab counter
-      const maxId = Math.max(0, ...(pd[p.id].tabs || []).map(t => parseInt(t.id.replace("tab-", "")) || 0));
-      tabCounter = Math.max(tabCounter, maxId + 1);
-    }
-    setProjects(ps);
-    setProjectData(pd);
-    if (apId && ps.find(p => p.id === apId)) setActiveProjectId(apId);
-    setHydrated(true);
-  }, []);
-
-  // ── Save ──
-  useEffect(() => {
-    if (!hydrated || projects.length === 0) return;
-    save("bento_projects", projects);
-    save("bento_active_project", activeProjectId);
-  }, [projects, activeProjectId, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated || !activeProjectId) return;
-    save(`bento_data_${activeProjectId}`, {
-      tabs: data.tabs.map(t => ({ id: t.id, name: t.name, topic: t.topic, platform: t.platform, idea: t.idea, usage: t.usage })),
-      savedIdeas: data.savedIdeas, folders: data.folders, moodBoards: data.moodBoards,
-    });
-  }, [projectData, activeProjectId, hydrated]);
-
-  // ── Project actions ──
-  const createProject = (info) => {
-    const id = `proj-${Date.now()}`;
-    const p = { id, ...info };
-    setProjects(prev => [...prev, p]);
-    setProjectData(prev => ({ ...prev, [id]: { tabs: [newTab()], savedIdeas: [], folders: [], moodBoards: {} } }));
-    setActiveProjectId(id);
-    setCreatingProject(false);
-    setView("generate");
-  };
-
-  const updateProject = (updated) => {
-    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
-  };
-
-  const deleteProject = (id) => {
-    if (projects.length <= 1) return;
-    if (!window.confirm("Delete this project and all its data?")) return;
-    setProjects(prev => prev.filter(p => p.id !== id));
-    setProjectData(prev => { const n = { ...prev }; delete n[id]; return n; });
-    localStorage.removeItem(`bento_data_${id}`);
-    if (activeProjectId === id) setActiveProjectId(projects.find(p => p.id !== id)?.id);
-  };
-
-  // ── Tab actions ──
-  const addTab = () => {
-    const t = newTab();
-    setData(cur => ({ tabs: [...cur.tabs, t] }));
-    setActiveTabId(t.id);
-  };
-  const closeTab = (id) => {
-    if (data.tabs.length <= 1) return;
-    const idx = data.tabs.findIndex(t => t.id === id);
-    const remaining = data.tabs.filter(t => t.id !== id);
-    setData(cur => ({ tabs: cur.tabs.filter(t => t.id !== id) }));
-    if (activeTabId === id) setActiveTabId(remaining[Math.max(0, idx - 1)]?.id);
-  };
-
-  // ── Generation ──
-  const runGenerate = async (tabId, topic, platform, resultsRef) => {
-    if (!proj) return;
-    isGeneratingRef.current = true;
-    setData(cur => ({ tabs: cur.tabs.map(t => t.id === tabId ? { ...t, loading: true, queued: false, error: null, idea: null, usage: null } : t) }));
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, platform, brand: proj.brand, audience: proj.audience, tone: proj.tone, brandStyle: proj.brandStyle, competitors: proj.competitors }),
-      });
-      if (!response.ok) throw new Error("API request failed");
-      const r = await response.json();
-      if (r.error) throw new Error(r.error);
-      setProjectData(prev => {
-        const d = prev[activeProjectId] || data;
-        return { ...prev, [activeProjectId]: { ...d, tabs: d.tabs.map(t => t.id === tabId ? { ...t, idea: r.idea, usage: r.usage, loading: false, name: topic.length > 25 ? topic.substring(0, 25) + "..." : topic } : t) } };
-      });
-      setTimeout(() => { resultsRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
-    } catch (err) {
-      console.error(err);
-      setProjectData(prev => {
-        const d = prev[activeProjectId] || data;
-        return { ...prev, [activeProjectId]: { ...d, tabs: d.tabs.map(t => t.id === tabId ? { ...t, error: "Something went wrong. Please try again.", loading: false } : t) } };
-      });
-    } finally {
-      isGeneratingRef.current = false;
-      if (queueRef.current.length > 0) { const next = queueRef.current.shift(); runGenerate(next.tabId, next.topic, next.platform, next.resultsRef); }
-    }
-  };
-
-  const requestGenerate = (tabId, topic, platform, resultsRef) => {
-    if (isGeneratingRef.current) {
-      queueRef.current = queueRef.current.filter(q => q.tabId !== tabId);
-      queueRef.current.push({ tabId, topic, platform, resultsRef });
-      setData(cur => ({ tabs: cur.tabs.map(t => t.id === tabId ? { ...t, queued: true, loading: true, error: null, idea: null, usage: null } : t) }));
-    } else { runGenerate(tabId, topic, platform, resultsRef); }
-  };
-
-  // ── Save idea ──
-  const onSaveIdea = (tab) => { setShowSaveModal(tab); };
-  const handleSaveToFolder = (folderId, newName) => {
-    const tab = showSaveModal;
-    if (!tab?.idea) return;
-    setData(cur => {
-      let fid = folderId;
-      let updatedFolders = cur.folders;
-      if (newName) { fid = `folder-${Date.now()}`; updatedFolders = [...cur.folders, { id: fid, name: newName }]; }
-      return { folders: updatedFolders, savedIdeas: [...cur.savedIdeas, { id: `saved-${Date.now()}`, idea: tab.idea, topic: tab.topic, platform: tab.platform, folderId: fid, savedAt: Date.now() }] };
-    });
-    setShowSaveModal(null);
-  };
-  const isIdeaSaved = (tab) => tab.idea ? data.savedIdeas.some(s => s.idea.angle === tab.idea.angle && s.topic === tab.topic) : false;
-  const deleteIdea = (id) => { setData(cur => ({ savedIdeas: cur.savedIdeas.filter(s => s.id !== id) })); };
-  const deleteFolder = (id) => { setData(cur => ({ folders: cur.folders.filter(f => f.id !== id), savedIdeas: cur.savedIdeas.filter(s => s.folderId !== id) })); };
-  const moveIdea = (ideaId, fid) => { setData(cur => ({ savedIdeas: cur.savedIdeas.map(s => s.id === ideaId ? { ...s, folderId: fid } : s) })); };
-  const createFolder = (name) => { setData(cur => ({ folders: [...cur.folders, { id: `folder-${Date.now()}`, name }] })); };
-
-  const setMoodBoards = (mb) => { setData({ moodBoards: mb }); };
-
-  const [activeTabId, setActiveTabId] = useState(null);
-  const currentTab = data.tabs.find(t => t.id === activeTabId) || data.tabs[0];
-
-  // ── Render ──
-  if (!hydrated) return <div style={{ ...S.app, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}><div style={S.loaderBox}>{[0,1,2,3].map(i => <div key={i} style={{ ...S.loaderCell, animationDelay: `${i * 0.15}s` }} />)}</div></div>;
-
-  if (projects.length === 0 || creatingProject) return <div style={S.app}><ProjectSetup isFirst={projects.length === 0} onComplete={createProject} /></div>;
-
-  if (!proj) return null;
-
-  return (
-    <div style={S.app}>
-      {showSettings && <SettingsModal project={proj} onSave={updateProject} onClose={() => setShowSettings(false)} />}
-      {showSaveModal && <SaveToFolderModal key={`save-${showSaveModal.id}`} folders={data.folders.map(f => ({ ...f, count: data.savedIdeas.filter(s => s.folderId === f.id).length }))} onSave={handleSaveToFolder} onClose={() => setShowSaveModal(null)} />}
-
-      <header style={S.header}>
-        <div style={{ ...S.headerLeft, cursor: "pointer" }} onClick={() => { setView("generate"); setShowProjectMenu(false); }}>
-          <div style={S.headerBento}><div style={{ ...S.hbCell, background: "#D4857A" }} /><div style={{ ...S.hbCell, background: "#9B72AA" }} /><div style={{ ...S.hbCell, background: "#6B937A" }} /><div style={{ ...S.hbCell, background: "#E8C869" }} /></div>
-          <span style={S.headerName}>Bento</span>
-        </div>
-        <div style={S.headerRight}>
-          {/* Project switcher */}
-          <div style={{ position: "relative" }}>
-            <button style={S.projectBtn} onClick={() => setShowProjectMenu(!showProjectMenu)}>
-              {proj.name} ▾
-            </button>
-            {showProjectMenu && <>
-              <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 }} onClick={() => setShowProjectMenu(false)} />
-              <div style={S.projectMenu}>
-                {projects.map(p => (
-                  <div key={p.id} style={{ ...S.projectMenuItem, ...(p.id === activeProjectId ? S.projectMenuItemActive : {}) }} onClick={() => { setActiveProjectId(p.id); setShowProjectMenu(false); setView("generate"); }}>
-                    <span>{p.name}</span>
-                    {projects.length > 1 && p.id !== activeProjectId && <button style={S.folderDeleteBtn} onClick={e => { e.stopPropagation(); deleteProject(p.id); }}>✕</button>}
-                  </div>
-                ))}
-                <div style={S.projectMenuDivider} />
-                <div style={S.projectMenuItem} onClick={() => { setCreatingProject(true); setShowProjectMenu(false); }}>+ New project</div>
-              </div>
-            </>}
-          </div>
-          <button style={{ ...S.viewToggle, ...(view === "generate" ? S.viewToggleActive : {}) }} onClick={() => { setView("generate"); setShowProjectMenu(false); }}>Generate</button>
-          <button style={{ ...S.viewToggle, ...(view === "saved" ? S.viewToggleActive : {}) }} onClick={() => { setView("saved"); setShowProjectMenu(false); }}>Saved{data.savedIdeas.length > 0 ? ` (${data.savedIdeas.length})` : ""}</button>
-          <button style={S.settingsBtn} onClick={() => { setShowSettings(true); setShowProjectMenu(false); }}>⚙</button>
-        </div>
-      </header>
-
-      {view === "generate" && (
-        <>
-          <div style={S.tabBar}><div style={S.tabList}>
-            {data.tabs.map(tab => (
-              <div key={tab.id} style={{ ...S.tab, ...(tab.id === (activeTabId || data.tabs[0]?.id) ? S.tabActive : {}) }} onClick={() => setActiveTabId(tab.id)}>
-                <span style={S.tabName}>{tab.loading && !tab.queued && <span style={S.tabSpinner}>⟳</span>}{tab.queued && <span style={{ fontSize: 12 }}>⏳</span>}{tab.name}</span>
-                {data.tabs.length > 1 && <button style={S.tabClose} onClick={e => { e.stopPropagation(); closeTab(tab.id); }}>✕</button>}
-              </div>
-            ))}
-            <button style={S.tabAdd} onClick={addTab}>+ New</button>
-          </div></div>
-          <main style={S.main}>
-            <TabContent key={currentTab.id} tab={currentTab} project={proj} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} onSaveIdea={onSaveIdea} isIdeaSaved={isIdeaSaved} />
-          </main>
-        </>
-      )}
-
-      {view === "saved" && (
-        <main style={S.main}>
-          <SavedView savedIdeas={data.savedIdeas} folders={data.folders} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} onCreateFolder={createFolder} brand={proj.brand} />
-        </main>
-      )}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Styles
-   ══════════════════════════════════════════ */
-const S = {
-  app: { fontFamily: "'Instrument Sans', 'Helvetica Neue', sans-serif", minHeight: "100vh", background: "#FAF8F5", color: "#1C1917" },
-  onboarding: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 },
-  onboardingCard: { maxWidth: 560, width: "100%", textAlign: "left", padding: "44px 40px", background: "#FFF", borderRadius: 20, border: "1px solid #E8E2D9", boxShadow: "0 8px 40px rgba(0,0,0,0.04)" },
-  onboardingBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, width: 48, height: 48, margin: "0 auto 20px", borderRadius: 10, overflow: "hidden" },
-  obCell1: { background: "#D4857A", borderRadius: "6px 2px 2px 2px" }, obCell2: { background: "#9B72AA", borderRadius: "2px 6px 2px 2px" },
-  obCell3: { background: "#6B937A", borderRadius: "2px 2px 2px 6px" }, obCell4: { background: "#E8C869", borderRadius: "2px 2px 6px 2px" },
-  obTitle: { fontSize: 34, fontWeight: 800, margin: "0 0 4px", letterSpacing: "-0.03em", textAlign: "center" },
-  obSub: { fontSize: 15, color: "#A39888", margin: "0 0 28px", fontStyle: "italic", textAlign: "center" },
-  obSection: { marginBottom: 18 }, obLabel: { display: "block", fontSize: 13, fontWeight: 700, color: "#1C1917", marginBottom: 6 },
-  obHint: { fontSize: 12, color: "#A39888", marginBottom: 10, lineHeight: 1.4 },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 32px", borderBottom: "1px solid #E8E2D9", background: "#FFFEFB", position: "sticky", top: 0, zIndex: 20 },
-  headerLeft: { display: "flex", alignItems: "center", gap: 10 },
-  headerBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, width: 22, height: 22, borderRadius: 4, overflow: "hidden" },
-  hbCell: { borderRadius: 2 }, headerName: { fontSize: 18, fontWeight: 800, letterSpacing: "-0.03em" },
-  headerRight: { display: "flex", alignItems: "center", gap: 6, position: "relative", zIndex: 51 },
-  settingsBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", cursor: "pointer", fontFamily: "inherit" },
-  projectBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, color: "#1C1917", cursor: "pointer", fontFamily: "inherit" },
-  projectMenu: { position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.1)", minWidth: 200, zIndex: 50, overflow: "hidden" },
-  projectMenuItem: { padding: "10px 16px", fontSize: 13, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#44403C" },
-  projectMenuItemActive: { background: "#FFF4F2", fontWeight: 700, color: "#1C1917" },
-  projectMenuDivider: { height: 1, background: "#EDE8DF" },
-  viewToggle: { background: "none", border: "1px solid transparent", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: "#A39888", cursor: "pointer", fontFamily: "inherit" },
-  viewToggleActive: { color: "#1C1917", background: "#FAF8F5", border: "1px solid #DDD5CA" },
-  tabBar: { borderBottom: "1px solid #E8E2D9", background: "#FFFEFB", padding: "0 32px", position: "sticky", top: 53, zIndex: 19 },
-  tabList: { display: "flex", alignItems: "center", gap: 2, overflowX: "auto" },
-  tab: { display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontSize: 13, fontWeight: 500, color: "#A39888", cursor: "pointer", borderBottom: "2px solid transparent", whiteSpace: "nowrap", fontFamily: "inherit" },
-  tabActive: { color: "#1C1917", fontWeight: 700, borderBottomColor: "#C07A8E" },
-  tabName: { display: "flex", alignItems: "center", gap: 4 },
-  tabSpinner: { display: "inline-block", animation: "spin 1s linear infinite", fontSize: 12 },
-  tabClose: { background: "none", border: "none", color: "#C4B9A8", fontSize: 11, cursor: "pointer", padding: "0 2px", lineHeight: 1 },
-  tabAdd: { background: "none", border: "none", color: "#C07A8E", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "10px 14px", fontFamily: "inherit", whiteSpace: "nowrap" },
-  main: { maxWidth: 1200, margin: "0 auto", padding: "28px 32px 60px" },
-  inputCard: { background: "#FFFEFB", border: "1px solid #E8E2D9", borderRadius: 16, padding: "22px 24px", marginBottom: 32 },
-  inputGrid: { display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" },
-  topicCol: { flex: 2.5, minWidth: 200 }, platformCol: { flex: 0.8, minWidth: 130 }, btnCol: { flex: 1, minWidth: 150 },
-  inputLabel: { display: "block", fontSize: 11, fontWeight: 700, color: "#A39888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 },
-  optionalTag: { fontSize: 9, fontWeight: 500, color: "#C4B9A8", textTransform: "lowercase", fontStyle: "italic" },
-  textInput: { width: "100%", padding: "11px 14px", fontSize: 14, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box" },
-  selectInput: { width: "100%", padding: "11px 14px", fontSize: 14, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box", appearance: "none", cursor: "pointer" },
-  generateBtn: { width: "100%", padding: "11px 20px", fontSize: 14, fontWeight: 700, color: "#FFF", background: "#C07A8E", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", boxSizing: "border-box" },
-  activeComps: { display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" },
-  activeCompsLabel: { fontSize: 11, fontWeight: 600, color: "#A39888", textTransform: "uppercase", letterSpacing: "0.06em" },
-  compChip: { fontSize: 12, fontWeight: 600, color: "#9B72AA", background: "#F0E4F6", padding: "4px 10px", borderRadius: 6 },
-  loadingWrap: { display: "flex", flexDirection: "column", alignItems: "center", padding: "80px 20px" },
-  loaderBox: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, width: 44, height: 44, marginBottom: 20 },
-  loaderCell: { background: "#C07A8E", borderRadius: 4, animation: "bentoPulse 1s ease-in-out infinite", opacity: 0.25 },
-  loadingMsg: { fontSize: 14, color: "#A39888", fontStyle: "italic" },
-  queuedWrap: { display: "flex", flexDirection: "column", alignItems: "center", padding: "80px 20px", gap: 8 },
-  queuedText: { fontSize: 15, color: "#A39888", fontWeight: 600 },
-  queuedSub: { fontSize: 13, color: "#C4B9A8" },
-  errorBox: { background: "#FFF5F3", border: "1px solid #FECDCA", borderRadius: 12, padding: "14px 20px", textAlign: "center", color: "#B42318", fontSize: 13 },
-  results: { marginTop: 4 },
-  resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
-  resultsLabel: { fontSize: 15, color: "#78716C", margin: 0 },
-  regenerateBtn: { padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  exportBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", background: "#FFFEFB", border: "1.5px solid #DDD5CA", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  topicHighlight: { color: "#C07A8E", fontWeight: 700 },
-  bentoBox: { border: "1.5px solid #E8E2D9", borderRadius: 18, overflow: "hidden", marginBottom: 20, background: "#FFF", boxShadow: "0 2px 16px rgba(0,0,0,0.03)" },
-  bentoTop: { padding: "22px 28px 18px", borderBottom: "1px solid #E8E2D9" },
-  formatTag: { display: "inline-block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px", borderRadius: 6, marginBottom: 10 },
-  angleTitle: { fontSize: 20, fontWeight: 800, margin: 0, lineHeight: 1.35, letterSpacing: "-0.02em", color: "#1C1917" },
-  bentoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 100 },
-  bentoLeft: { padding: "22px 24px", borderRight: "1px solid #E8E2D9" }, bentoRight: { padding: "22px 24px" },
-  compartmentLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A39888", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 },
-  researchStack: { display: "flex", flexDirection: "column", gap: 10 },
-  researchCard: { background: "#FAF8F5", borderRadius: 10, padding: "14px 16px", border: "1px solid #EDE8DF" },
-  researchText: { fontSize: 13, lineHeight: 1.65, color: "#44403C", margin: "0 0 6px" },
-  keyHighlight: { background: "linear-gradient(120deg, #FEF3C7 0%, #FDE68A 100%)", padding: "1px 4px", borderRadius: 3, fontWeight: 600, color: "#92400E" },
-  sourceText: { fontSize: 11, color: "#A39888", fontStyle: "italic", lineHeight: 1.4, display: "block" },
-  sourceLink: { color: "#C07A8E", textDecoration: "none", fontStyle: "normal", fontWeight: 600 },
-  briefStack: { display: "flex", flexDirection: "column", gap: 14 }, briefStep: { padding: 0 },
-  stepLabel: { display: "inline-block", fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, marginBottom: 8 },
-  stepContent: { fontSize: 13, lineHeight: 1.6, color: "#44403C", margin: 0 },
-  briefStructured: { display: "flex", flexDirection: "column", gap: 4 },
-  briefLine: { fontSize: 13, lineHeight: 1.55, color: "#44403C" },
-  briefLabel: { fontWeight: 700, color: "#1C1917", marginRight: 4, fontSize: 12 },
-  briefValue: { color: "#44403C" },
-  vdSection: { padding: "22px 24px", borderTop: "1px solid #E8E2D9", background: "#FEFCFA" },
-  vdGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  vdCard: { background: "#FAF8F5", borderRadius: 10, padding: "16px 18px", border: "1px solid #EDE8DF" },
-  vdCardLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#A39888", marginBottom: 10 },
-  vdText: { fontSize: 13, lineHeight: 1.55, color: "#44403C", margin: 0 },
-  vdMood: { fontSize: 16, fontWeight: 700, color: "#1C1917", margin: 0 },
-  refList: { display: "flex", flexDirection: "column", gap: 10 },
-  refItem: { display: "flex", flexDirection: "column", gap: 2 },
-  refHandle: { fontSize: 13, fontWeight: 700, color: "#1C1917" },
-  refLink: { fontSize: 13, fontWeight: 700, color: "#C07A8E", textDecoration: "none" },
-  refNote: { fontSize: 12, color: "#78716C", fontStyle: "italic", lineHeight: 1.4 },
-  bulletList: { display: "flex", flexDirection: "column", gap: 6 },
-  bulletItem: { display: "flex", alignItems: "flex-start", gap: 8 },
-  bulletDot: { width: 5, height: 5, borderRadius: "50%", background: "#C07A8E", flexShrink: 0, marginTop: 7 },
-  bulletText: { fontSize: 13, lineHeight: 1.55, color: "#44403C" },
-  moodSection: { padding: "22px 24px", borderTop: "1px solid #E8E2D9", background: "#FDFCFA" },
-  moodGrid: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 },
-  moodItem: { background: "#FAF8F5", borderRadius: 8, padding: "10px 14px", border: "1px solid #EDE8DF" },
-  moodItemTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  moodLink: { fontSize: 13, color: "#C07A8E", fontWeight: 600, textDecoration: "none" },
-  moodRemove: { background: "none", border: "none", color: "#C4B9A8", fontSize: 12, cursor: "pointer", padding: 2 },
-  moodNote: { fontSize: 12, color: "#78716C", fontStyle: "italic", display: "block", marginTop: 4 },
-  moodInput: { display: "flex", gap: 8, alignItems: "center" },
-  moodAddBtn: { padding: "10px 16px", fontSize: 12, fontWeight: 700, color: "#78716C", background: "#FAF8F5", border: "1.5px solid #DDD5CA", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  bentoBottom: { padding: "18px 28px", borderTop: "1px solid #E8E2D9", background: "#FDFCFA" },
-  whyLabel: { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A39888", display: "block", marginBottom: 6 },
-  whyText: { fontSize: 13, lineHeight: 1.6, color: "#57534E", margin: 0 },
-  usageBar: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "12px 0 0", opacity: 0.5 },
-  usageItem: { fontSize: 11, color: "#A39888", fontFamily: "monospace" },
-  usageDot: { fontSize: 11, color: "#DDD5CA" },
-  saveBtn: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "#FFF4F2", border: "1.5px solid #FFE9E5", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  savedBtnDone: { padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#6B937A", background: "#F1F7F3", border: "1.5px solid #E1EDE5", borderRadius: 8, cursor: "default", fontFamily: "inherit", whiteSpace: "nowrap" },
-  empty: { display: "flex", flexDirection: "column", alignItems: "center", padding: "100px 20px" },
-  emptyBento: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, width: 64, height: 64, marginBottom: 20 },
-  emptyCell: { background: "#1C1917", borderRadius: 6 }, emptyText: { fontSize: 14, color: "#A39888" },
-  modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(28,25,23,0.35)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
-  modal: { background: "#FFF", borderRadius: 18, padding: "32px 30px", maxWidth: 560, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.12)", maxHeight: "90vh", overflowY: "auto" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" },
-  closeBtn: { background: "none", border: "none", fontSize: 16, color: "#A39888", cursor: "pointer" },
-  settingsSection: { marginBottom: 18 }, settingsLabel: { display: "block", fontSize: 13, fontWeight: 700, color: "#1C1917", marginBottom: 4 },
-  settingsHint: { fontSize: 12, color: "#A39888", marginBottom: 8, lineHeight: 1.4 },
-  brandTextarea: { width: "100%", padding: "13px 14px", fontSize: 13, border: "1.5px solid #DDD5CA", borderRadius: 10, fontFamily: "inherit", color: "#1C1917", background: "#FAF8F5", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 },
-  primaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 700, color: "#FFF", background: "#C07A8E", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
-  secondaryBtn: { flex: 1, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: "#78716C", background: "#FAF8F5", border: "1.5px solid #DDD5CA", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
-  folderOption: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, border: "1.5px solid #EDE8DF", cursor: "pointer", fontSize: 13 },
-  folderOptionActive: { borderColor: "#C07A8E", background: "#FFF4F2" },
-  folderCount: { fontSize: 11, color: "#A39888", fontWeight: 600 },
-  savedLayout: { display: "grid", gridTemplateColumns: "240px 1fr", gap: 24, minHeight: 400 },
-  savedSidebar: { display: "flex", flexDirection: "column", gap: 4 },
-  folderItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, color: "#78716C" },
-  folderItemActive: { background: "#FFF4F2", color: "#1C1917", fontWeight: 700 },
-  folderDeleteBtn: { background: "none", border: "none", color: "#C4B9A8", fontSize: 10, cursor: "pointer", padding: 2, opacity: 0.5 },
-  newFolderBtn: { padding: "10px 14px", fontSize: 12, fontWeight: 700, color: "#C07A8E", background: "none", border: "1.5px dashed #FFE9E5", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginTop: 4 },
-  savedContent: { display: "flex", flexDirection: "column", gap: 12 },
-  savedContentHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  savedContentTitle: { fontSize: 16, fontWeight: 800, color: "#1C1917", margin: 0 },
-  exportActions: { display: "flex", gap: 6 },
-  exportBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#78716C", background: "#FFFEFB", border: "1.5px solid #DDD5CA", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
-  savedCard: { background: "#FFF", border: "1px solid #E8E2D9", borderRadius: 14, padding: "16px 20px", cursor: "pointer" },
-  savedCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  savedMeta: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
-  savedPlatform: { fontSize: 11, fontWeight: 700, color: "#C07A8E", textTransform: "uppercase", letterSpacing: "0.06em" },
-  savedTopic: { fontSize: 11, color: "#A39888" },
-  savedDate: { fontSize: 11, color: "#C4B9A8" },
-  savedAngle: { fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: "#1C1917", lineHeight: 1.35 },
-  savedFormat: { fontSize: 12, color: "#78716C" },
-  savedDeleteBtn: { background: "none", border: "1px solid #FECDCA", borderRadius: 6, color: "#B42318", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" },
-  savedMoveBtn: { background: "none", border: "1px solid #DDD5CA", borderRadius: 6, color: "#78716C", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" },
-  moveDropdown: { display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderTop: "1px solid #EDE8DF", marginTop: 10 },
-  moveOption: { padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#44403C" },
-  moveOptionEmpty: { padding: "8px 12px", fontSize: 12, color: "#C4B9A8", fontStyle: "italic" },
+const P = {
+  bg: "#FFF5F5", card: "#FFFFFF", border: "#F4A7B9", borderDark: "#E8627C",
+  accent: "#E8627C", accentSoft: "#FFF0F3",
+  comp1: "#FFF0F3", comp2: "#F0EDFF", comp3: "#E8FFF0", comp4: "#FFF6E0",
+  text: "#2B2B2B", textMid: "#4A4545", textLight: "#9E9494",
+  keyBg: "#FFF6E0", keyText: "#B8860B", shadow: "#F4A7B9",
 };
+const font = { h: "'Sora', sans-serif", b: "'Plus Jakarta Sans', sans-serif" };
+
+// ═══ Storage ═══
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function ld(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}}
+
+// ═══ Display Components ═══
+function Key({text}){return<span>{(text||"").split(/(<key>.*?<\/key>)/g).map((p,i)=>p.startsWith("<key>")?<span key={i} style={{background:P.keyBg,padding:"1px 5px",borderRadius:4,fontWeight:700,color:P.keyText}}>{p.replace(/<\/?key>/g,"")}</span>:<span key={i}>{p}</span>)}</span>}
+function SrcLink({source}){const m=(source||"").match(/(https?:\/\/[^\s)]+)/);if(m){const u=m[1],l=source.replace(u,"").replace(/[—\-–]\s*$/,"").replace(/\s*[—\-–]\s*/,"").trim(),s=u.replace(/^https?:\/\/(www\.)?/,"").split("/").slice(0,2).join("/");return<span style={{fontSize:11,color:P.textLight,fontStyle:"italic",display:"block"}}>{l&&<>{l} — </>}<a href={u} target="_blank" rel="noopener noreferrer" style={{color:P.accent,textDecoration:"none",fontWeight:600,fontStyle:"normal"}}>{s}</a></span>}return<span style={{fontSize:11,color:P.textLight,fontStyle:"italic"}}>{source}</span>}
+function BriefContent({content}){const lines=(content||"").split(/\n|(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway):)/gi);const parsed=[];let cur=null;for(const l of lines){const m=l.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Audio|Text|Hook|CTA|Format|Timing|Scene|H2|Key points|Takeaway)\s*:\s*(.*)/i);if(m){if(cur)parsed.push(cur);cur={label:m[1],text:m[2].trim()}}else if(l.trim()){if(cur)cur.text+=" "+l.trim();else parsed.push({label:null,text:l.trim()})}}if(cur)parsed.push(cur);if(parsed.some(p=>p.label))return<div style={{display:"flex",flexDirection:"column",gap:4}}>{parsed.map((p,i)=><div key={i} style={{fontSize:13,lineHeight:1.55,color:P.textMid}}>{p.label&&<span style={{fontWeight:700,color:P.text,marginRight:4,fontSize:12}}>{p.label}:</span>}<span>{p.text}</span></div>)}</div>;return<p style={{fontSize:13,lineHeight:1.6,color:P.textMid,margin:0}}>{content}</p>}
+function Bullets({text}){const b=(text||"").split("•").map(s=>s.trim()).filter(Boolean);if(b.length<=1)return<p style={{fontSize:13,lineHeight:1.55,color:P.textMid,margin:0}}>{text}</p>;return<div style={{display:"flex",flexDirection:"column",gap:5}}>{b.map((x,i)=><div key={i} style={{display:"flex",alignItems:"flex-start",gap:8}}><span style={{width:6,height:6,borderRadius:"50%",background:P.accent,flexShrink:0,marginTop:6}}/><span style={{fontSize:13,lineHeight:1.5,color:P.textMid}}>{x}</span></div>)}</div>}
+
+function VisualDirection({vd}){if(!vd)return null;const refs=vd.references||vd.reference_accounts||[];const hasUrls=refs.some(r=>r.handle&&r.handle.match(/https?:\/\//));return(
+<div style={{padding:"24px 26px",borderTop:`2px solid ${P.border}`,background:P.comp2}}>
+  <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.1em",color:P.text,marginBottom:16,fontFamily:font.h}}>🎨 VISUAL DIRECTION</div>
+  <div className="vd-grid">
+    <div style={{background:"#FFF",borderRadius:12,padding:"16px 18px",border:`1.5px solid ${P.border}`}}><div style={{fontSize:9,fontWeight:800,letterSpacing:"0.12em",color:P.textLight,marginBottom:8,fontFamily:font.h}}>MOOD</div><p style={{fontSize:18,fontWeight:800,margin:0,fontFamily:font.h,color:P.text}}>{vd.mood}</p></div>
+    <div style={{background:"#FFF",borderRadius:12,padding:"16px 18px",border:`1.5px solid ${P.border}`}}><div style={{fontSize:9,fontWeight:800,letterSpacing:"0.12em",color:P.textLight,marginBottom:8,fontFamily:font.h}}>LAYOUT</div><Bullets text={vd.layout}/></div>
+    <div style={{background:"#FFF",borderRadius:12,padding:"16px 18px",border:`1.5px solid ${P.border}`}}><div style={{fontSize:9,fontWeight:800,letterSpacing:"0.12em",color:P.textLight,marginBottom:8,fontFamily:font.h}}>CREATIVE CONCEPT</div><Bullets text={vd.creative_concept||vd.imagery_and_icons}/></div>
+    {refs.length>0&&<div style={{background:"#FFF",borderRadius:12,padding:"16px 18px",border:`1.5px solid ${P.border}`}}><div style={{fontSize:9,fontWeight:800,letterSpacing:"0.12em",color:P.textLight,marginBottom:8,fontFamily:font.h}}>{hasUrls?"REFERENCE ARTICLES":"STUDY THESE"}</div>{refs.map((r,i)=>{const um=r.handle&&r.handle.match(/(https?:\/\/[^\s]+)/);if(um){const url=um[1],label=r.handle.replace(url,"").replace(/[—\-–]\s*$/,"").replace(/\s*[—\-–]\s*/,"").trim(),short=url.replace(/^https?:\/\/(www\.)?/,"").split("/").slice(0,2).join("/");return<div key={i} style={{marginBottom:8}}><a href={url} target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:700,color:P.accent,textDecoration:"none",display:"block"}}>{label||short}</a><span style={{fontSize:12,color:P.textLight,fontStyle:"italic"}}>{r.note}</span></div>}return<div key={i} style={{marginBottom:8}}><span style={{fontSize:13,fontWeight:700,color:P.accent,display:"block"}}>{r.handle}</span><span style={{fontSize:12,color:P.textLight,fontStyle:"italic"}}>{r.note}</span></div>})}</div>}
+  </div>
+</div>)}
+
+function MoodBoard({boardKey,moodBoards,setMoodBoards}){const[url,setUrl]=useState("");const[note,setNote]=useState("");const boards=moodBoards[boardKey]||[];const add=()=>{if(!url.trim())return;const n={...moodBoards};if(!n[boardKey])n[boardKey]=[];n[boardKey]=[...n[boardKey],{url:url.trim(),note:note.trim()}];setMoodBoards(n);setUrl("");setNote("")};const remove=(idx)=>{const n={...moodBoards};n[boardKey]=n[boardKey].filter((_,i)=>i!==idx);setMoodBoards(n)};const domain=(u)=>{try{return u.replace(/^https?:\/\/(www\.)?/,"").split("/")[0]}catch{return"link"}};return(
+<div style={{padding:"20px 26px",borderTop:`2px solid ${P.border}`,background:P.comp4}}>
+  <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.1em",color:P.text,marginBottom:14,fontFamily:font.h}}>📌 MY MOOD BOARD</div>
+  {boards.length>0&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>{boards.map((item,i)=><div key={i} style={{background:"#FFF",borderRadius:8,padding:"10px 14px",border:`1px solid ${P.border}`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><a href={item.url} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:P.accent,fontWeight:600,textDecoration:"none"}}>{domain(item.url)} ↗</a><button style={{background:"none",border:"none",color:P.textLight,fontSize:12,padding:2}} onClick={()=>remove(i)}>✕</button></div>{item.note&&<span style={{fontSize:12,color:P.textLight,fontStyle:"italic",display:"block",marginTop:4}}>{item.note}</span>}</div>)}</div>}
+  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+    <input style={{flex:2,minWidth:120,padding:"10px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:"#FFF",boxSizing:"border-box",fontFamily:font.b}} value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a link..." onKeyDown={e=>{if(e.key==="Enter")add()}}/>
+    <input style={{flex:1,minWidth:80,padding:"10px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:"#FFF",boxSizing:"border-box",fontFamily:font.b}} value={note} onChange={e=>setNote(e.target.value)} placeholder="Note" onKeyDown={e=>{if(e.key==="Enter")add()}}/>
+    <button style={{width:40,height:40,fontSize:18,fontWeight:700,color:"#FFF",background:P.accent,border:`1.5px solid ${P.borderDark}`,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font.b}} onClick={add}>+</button>
+  </div>
+</div>)}
+
+function IdeaCard({idea,index,boardKey,moodBoards,setMoodBoards,onSave,isSaved}){return(
+<div style={{border:`2px solid ${P.border}`,borderRadius:22,overflow:"hidden",marginBottom:24,background:P.card,boxShadow:`4px 4px 0 ${P.shadow}`}}>
+  <div style={{padding:"24px 28px 20px",borderBottom:`2px solid ${P.border}`,background:P.accentSoft,position:"relative"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+      <div><div style={{display:"inline-block",fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.12em",padding:"6px 14px",borderRadius:20,background:P.accent,color:"#FFF",marginBottom:12,border:`1.5px solid ${P.borderDark}`,fontFamily:font.h}}>{idea.format}</div><h3 style={{fontSize:20,fontWeight:800,margin:0,lineHeight:1.3,letterSpacing:"-0.02em",fontFamily:font.h,color:P.text}}>{idea.angle}</h3></div>
+      {onSave&&<button style={{padding:"7px 16px",fontSize:12,fontWeight:700,color:isSaved?"#6BC9A0":P.accent,background:"#FFF",border:`1.5px solid ${isSaved?"#6BC9A0":P.accent}`,borderRadius:20,fontFamily:font.b,whiteSpace:"nowrap",flexShrink:0}} onClick={onSave} disabled={isSaved}>{isSaved?"✓ Saved":"Save ♡"}</button>}
+    </div>
+  </div>
+  <div className="bento-grid">
+    <div style={{padding:"24px 22px",borderRight:`2px solid ${P.border}`,background:P.comp1}}>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.1em",color:P.text,marginBottom:16,fontFamily:font.h}}>🔬 RESEARCH</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>{(idea.research||[]).map((r,i)=><div key={i} style={{background:"#FFF",borderRadius:12,padding:"14px 16px",border:`1.5px solid ${P.border}`}}><p style={{fontSize:13,lineHeight:1.6,color:P.textMid,margin:"0 0 6px"}}><Key text={r.point}/></p><SrcLink source={r.source}/></div>)}</div>
+    </div>
+    <div style={{padding:"24px 26px",background:P.card}}>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.1em",color:P.text,marginBottom:16,fontFamily:font.h}}>📋 CONTENT BRIEF</div>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>{(idea.brief||[]).map((b,i)=><div key={i}><div style={{display:"inline-block",fontSize:10,fontWeight:700,padding:"4px 12px",borderRadius:20,background:P.accentSoft,color:P.accent,marginBottom:8,border:`1px solid ${P.border}`,fontFamily:font.h}}>{b.step}</div><BriefContent content={b.content}/></div>)}</div>
+    </div>
+  </div>
+  <VisualDirection vd={idea.visual_direction}/>
+  <MoodBoard boardKey={boardKey} moodBoards={moodBoards} setMoodBoards={setMoodBoards}/>
+  <div style={{padding:"20px 26px",borderTop:`2px solid ${P.border}`,background:P.comp3}}>
+    <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.1em",color:P.text,marginBottom:10,fontFamily:font.h}}>✨ WHY THIS WORKS</div>
+    <p style={{fontSize:13,lineHeight:1.6,color:P.textMid,margin:0}}>{idea.why}</p>
+  </div>
+</div>)}
+
+function LoadingState(){const msgs=["Researching the topic...","Crafting your brief...","Building visual direction...","Packing your bento..."];const[i,setI]=useState(0);useEffect(()=>{const t=setInterval(()=>setI(n=>(n+1)%msgs.length),2500);return()=>clearInterval(t)},[]);return<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:52,height:52,marginBottom:24,borderRadius:12,overflow:"hidden",border:`2px solid ${P.border}`,padding:4,background:"#FFF"}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,borderRadius:5,animation:"bentoPulse 1s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>)}</div><p style={{fontSize:14,color:P.textLight,fontStyle:"italic"}}>{msgs[i]}</p></div>}
+function UsageCounter({usage}){if(!usage)return null;return<div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,padding:"12px 0 0",opacity:0.4}}><span style={{fontSize:11,color:P.textLight,fontFamily:"monospace"}}>Tokens: {(usage.input_tokens+usage.output_tokens).toLocaleString()}</span><span style={{fontSize:11,color:"#DDD"}}>·</span><span style={{fontSize:11,color:P.textLight,fontFamily:"monospace"}}>Cost: ${usage.cost}</span></div>}
+
+// ═══ Modals ═══
+function SettingsModal({project,onSave,onClose}){const[db,setDb]=useState(project.brand);const[da,setDa]=useState(project.audience);const[dt,setDt]=useState(project.tone);const[ds,setDs]=useState(project.brandStyle||"");const[dn,setDn]=useState(project.name);const[dc,setDc]=useState(()=>{const a=[...(project.competitors||[])];while(a.length<3)a.push("");return a});const uc=(i,v)=>{const n=[...dc];n[i]=v;setDc(n)};return(
+<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(43,43,43,0.3)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}><div style={{background:"#FFF",borderRadius:20,padding:"32px 30px",maxWidth:540,width:"100%",boxShadow:`6px 6px 0 ${P.shadow}`,border:`2px solid ${P.border}`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><h2 style={{fontSize:18,fontWeight:800,margin:0,fontFamily:font.h}}>Project Settings</h2><button style={{background:"none",border:"none",fontSize:16,color:P.textLight}}>✕</button></div>
+  {[["Project Name",dn,setDn,"Hers"],["Brand",db,setDb,"https://www.forhers.com/"]].map(([l,v,fn,ph])=><div key={l} style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>{l}</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={v} onChange={e=>fn(e.target.value)} placeholder={ph}/></div>)}
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Target Audience</label><textarea style={{width:"100%",padding:"12px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,resize:"vertical",lineHeight:1.6}} value={da} onChange={e=>setDa(e.target.value)} rows={2}/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Tone of Voice</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={dt} onChange={e=>setDt(e.target.value)}/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Brand Visual Style <span style={{fontSize:9,color:P.textLight,fontStyle:"italic",fontWeight:500}}>optional</span></label><textarea style={{width:"100%",padding:"12px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,resize:"vertical",lineHeight:1.6}} value={ds} onChange={e=>setDs(e.target.value)} rows={2}/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Competitors <span style={{fontSize:9,color:P.textLight,fontStyle:"italic",fontWeight:500}}>optional — up to 3</span></label>{dc.map((c,i)=><input key={i} style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,marginBottom:8}} value={c} onChange={e=>uc(i,e.target.value)} placeholder={`Competitor ${i+1}`}/>)}</div>
+  <div style={{display:"flex",gap:10,marginTop:20}}><button style={{flex:1,padding:"12px",fontSize:13,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:10,fontFamily:font.b}} onClick={onClose}>Cancel</button><button style={{flex:1,padding:"12px",fontSize:13,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:10,fontFamily:font.h,boxShadow:`2px 2px 0 ${P.shadow}`,opacity:db.trim()&&da.trim()&&dt.trim()&&dn.trim()?1:0.4}} onClick={()=>{if(db.trim()&&da.trim()&&dt.trim()&&dn.trim()){onSave({...project,name:dn.trim(),brand:db.trim(),audience:da.trim(),tone:dt.trim(),brandStyle:ds.trim(),competitors:dc.filter(c=>c.trim())});onClose()}}}>Save</button></div>
+</div></div>)}
+
+function SaveToFolderModal({folders,onSave,onClose}){const[sel,setSel]=useState(folders[0]?.id||"");const[newName,setNewName]=useState("");const[showNew,setShowNew]=useState(false);return(
+<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(43,43,43,0.3)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}><div style={{background:"#FFF",borderRadius:20,padding:"32px 30px",maxWidth:400,width:"100%",boxShadow:`6px 6px 0 ${P.shadow}`,border:`2px solid ${P.border}`}} onClick={e=>e.stopPropagation()}>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><h2 style={{fontSize:18,fontWeight:800,margin:0,fontFamily:font.h}}>Save to folder</h2><button style={{background:"none",border:"none",fontSize:16,color:P.textLight}} onClick={onClose}>✕</button></div>
+  {folders.length>0&&!showNew&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>{folders.map(f=><div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderRadius:10,border:`1.5px solid ${sel===f.id?P.accent:P.border}`,background:sel===f.id?P.accentSoft:"#FFF",cursor:"pointer"}} onClick={()=>setSel(f.id)}><span style={{fontSize:13}}>📁 {f.name}</span><span style={{fontSize:11,color:P.textLight,fontWeight:600}}>{f.count||0}</span></div>)}</div>}
+  {showNew?<div style={{marginBottom:16}}><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e=>{if(e.key==="Enter"&&newName.trim())onSave(null,newName.trim())}}/></div>:<button style={{width:"100%",padding:"10px",fontSize:13,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:10,fontFamily:font.b,marginBottom:16}} onClick={()=>setShowNew(true)}>+ New folder</button>}
+  <div style={{display:"flex",gap:10}}><button style={{flex:1,padding:"10px",fontSize:13,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:10,fontFamily:font.b}} onClick={onClose}>Cancel</button><button style={{flex:1,padding:"10px",fontSize:13,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:10,fontFamily:font.h,boxShadow:`2px 2px 0 ${P.shadow}`,opacity:(showNew?newName.trim():sel)?1:0.4}} onClick={()=>{if(showNew&&newName.trim())onSave(null,newName.trim());else if(sel)onSave(sel,null)}}>Save</button></div>
+</div></div>)}
+
+function NewFolderModal({onSave,onClose}){const[name,setName]=useState("");return(
+<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(43,43,43,0.3)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}><div style={{background:"#FFF",borderRadius:20,padding:"32px 30px",maxWidth:380,width:"100%",boxShadow:`6px 6px 0 ${P.shadow}`,border:`2px solid ${P.border}`}} onClick={e=>e.stopPropagation()}>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><h2 style={{fontSize:18,fontWeight:800,margin:0,fontFamily:font.h}}>New folder</h2><button style={{background:"none",border:"none",fontSize:16,color:P.textLight}} onClick={onClose}>✕</button></div>
+  <input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={name} onChange={e=>setName(e.target.value)} placeholder="Folder name" autoFocus onKeyDown={e=>{if(e.key==="Enter"&&name.trim()){onSave(name.trim());onClose()}}}/>
+  <div style={{display:"flex",gap:10,marginTop:16}}><button style={{flex:1,padding:"10px",fontSize:13,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:10,fontFamily:font.b}} onClick={onClose}>Cancel</button><button style={{flex:1,padding:"10px",fontSize:13,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:10,fontFamily:font.h,boxShadow:`2px 2px 0 ${P.shadow}`,opacity:name.trim()?1:0.4}} onClick={()=>{if(name.trim()){onSave(name.trim());onClose()}}}>Create</button></div>
+</div></div>)}
+
+// ═══ Project Setup ═══
+function ProjectSetup({onComplete,isFirst}){const[n,setN]=useState("");const[b,setB]=useState("");const[a,setA]=useState("");const[t,setT]=useState("");const[s,setS]=useState("");const[c,setC]=useState(["","",""]);const uc=(i,v)=>{const arr=[...c];arr[i]=v;setC(arr)};const ok=n.trim()&&b.trim()&&a.trim()&&t.trim();return(
+<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}><div style={{maxWidth:540,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`}}>
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,width:56,height:56,margin:"0 auto 16px",borderRadius:14,overflow:"hidden",border:`2px solid ${P.border}`}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both",animationDelay:`${i*0.08}s`}}/>)}</div>
+  <h1 style={{fontSize:36,fontWeight:800,textAlign:"center",letterSpacing:"-0.04em",margin:"0 0 2px",fontFamily:font.h}}>{isFirst?"Bento":"New Project"}</h1>
+  <p style={{fontSize:14,color:P.textLight,textAlign:"center",margin:"0 0 32px"}}>{isFirst?"Content ideas, neatly packed. 🍱":"Set up a new brand workspace."}</p>
+  {[["Project Name",n,setN,'e.g., "Hers"'],["Brand",b,setB,"https://www.forhers.com/"]].map(([l,v,fn,ph])=><div key={l} style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>{l}</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={v} onChange={e=>fn(e.target.value)} placeholder={ph}/></div>)}
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Target Audience</label><textarea style={{width:"100%",padding:"12px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,resize:"vertical",lineHeight:1.6}} value={a} onChange={e=>setA(e.target.value)} placeholder="Women 25–44 seeking convenient, discreet, and affordable telehealth services for mental health, dermatology, sexual health, and weight loss" rows={2}/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Tone of Voice</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={t} onChange={e=>setT(e.target.value)} placeholder="Empowering, modern, direct, approachable — not clinical or salesy"/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Brand Visual Style <span style={{fontSize:9,color:P.textLight,fontStyle:"italic",fontWeight:500}}>optional</span></label><textarea style={{width:"100%",padding:"12px 14px",fontSize:13,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,resize:"vertical",lineHeight:1.6}} value={s} onChange={e=>setS(e.target.value)} placeholder='e.g., "Minimal, modern, muted earth tones..."' rows={2}/></div>
+  <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>Competitors <span style={{fontSize:9,color:P.textLight,fontStyle:"italic",fontWeight:500}}>optional — up to 3</span></label>{c.map((v,i)=><input key={i} style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,marginBottom:8}} value={v} onChange={e=>uc(i,e.target.value)} placeholder={`Competitor ${i+1}`}/>)}</div>
+  <button style={{width:"100%",marginTop:16,padding:"14px",fontSize:15,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:12,fontFamily:font.h,boxShadow:`3px 3px 0 ${P.shadow}`,opacity:ok?1:0.4}} onClick={()=>{if(ok)onComplete({name:n.trim(),brand:b.trim(),audience:a.trim(),tone:t.trim(),brandStyle:s.trim(),competitors:c.filter(v=>v.trim())})}}>{isFirst?"Get started →":"Create project →"}</button>
+</div></div>)}
+
+// ═══ Export helpers ═══
+function buildPrintHtml(ideas,folderName){const clean=(t)=>(t||"").replace(/<\/?key>/g,"").replace(/</g,"&lt;").replace(/>/g,"&gt;");const bullets=(t)=>(t||"").split("•").filter(Boolean).map(b=>`<li>${clean(b.trim())}</li>`).join("");return`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${folderName}</title><style>@import url('https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Plus Jakarta Sans',sans-serif;color:#2B2B2B;padding:40px;font-size:11pt;line-height:1.6}.idea{page-break-after:always;margin-bottom:40px}.idea:last-child{page-break-after:auto}.hdr{border-bottom:2px solid #F4A7B9;padding-bottom:12px;margin-bottom:20px}.hdr h1{font-size:10pt;color:#E8627C;text-transform:uppercase;letter-spacing:2px;font-weight:700;font-family:'Sora',sans-serif}.hdr .meta{font-size:9pt;color:#9E9494;margin-top:4px}.fmt{font-size:9pt;color:#E8627C;text-transform:uppercase;letter-spacing:1px;font-weight:700;font-family:'Sora',sans-serif;margin-bottom:6px}.ang{font-size:18pt;font-weight:800;margin-bottom:20px;line-height:1.25;font-family:'Sora',sans-serif}.stitle{font-size:9pt;color:#E8627C;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin:24px 0 12px;font-family:'Sora',sans-serif}.ri{background:#FFF0F3;border-radius:6px;padding:10px 14px;margin-bottom:8px;border:1px solid #F4A7B9}.ri p{font-size:10pt;color:#4A4545;margin-bottom:4px}.ri .src{font-size:8pt;color:#9E9494;font-style:italic}.bs{margin-bottom:12px}.sl{display:inline-block;font-size:8pt;font-weight:700;color:#E8627C;background:#FFF0F3;padding:2px 8px;border-radius:12px;margin-bottom:6px;font-family:'Sora',sans-serif}.bl{font-size:10pt;color:#4A4545;margin-bottom:2px}.bl strong{color:#2B2B2B}.vg{display:grid;grid-template-columns:1fr 1fr;gap:12px}.vc{background:#F0EDFF;border-radius:6px;padding:12px;border:1px solid #DDD8F5}.vl{font-size:8pt;color:#9E9494;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;font-family:'Sora',sans-serif}.vm{font-size:13pt;font-weight:800;font-family:'Sora',sans-serif}.vc ul{padding-left:16px;font-size:10pt;color:#4A4545}.vc li{margin-bottom:4px}.rh{font-size:10pt;font-weight:700;color:#E8627C}.rn{font-size:9pt;color:#9E9494;font-style:italic}.why{font-size:10pt;color:#4A4545;margin-top:8px;background:#E8FFF0;padding:12px;border-radius:6px}.hr{border:none;border-top:1px solid #F4A7B9;margin:20px 0}@media print{body{padding:20px}}</style></head><body>${ideas.map(saved=>{const idea=saved.idea;const vd=idea.visual_direction||{};const refs=vd.references||vd.reference_accounts||[];const bc=(content)=>(content||"").split(/(?=(?:Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):)/gi).map(line=>{const m=line.match(/^(Headline|Body|Visual|Caption|Voiceover|On-screen text|Hook|CTA|Timing|H2|Key points|Takeaway):\s*(.*)/is);return m?`<div class="bl"><strong>${m[1]}:</strong> ${clean(m[2].trim())}</div>`:line.trim()?`<div class="bl">${clean(line.trim())}</div>`:""}).join("");return`<div class="idea"><div class="hdr"><h1>Bento</h1><div class="meta">${saved.platform} · ${clean(saved.topic)}</div></div><div class="fmt">${clean(idea.format)}</div><div class="ang">${clean(idea.angle)}</div><div class="stitle">🔬 Research</div>${(idea.research||[]).map(r=>`<div class="ri"><p>${clean(r.point)}</p><div class="src">${clean(r.source)}</div></div>`).join("")}<hr class="hr"><div class="stitle">📋 Content Brief</div>${(idea.brief||[]).map(b=>`<div class="bs"><div class="sl">${clean(b.step)}</div>${bc(b.content)}</div>`).join("")}<hr class="hr"><div class="stitle">🎨 Visual Direction</div><div class="vg">${vd.mood?`<div class="vc"><div class="vl">Mood</div><div class="vm">${clean(vd.mood)}</div></div>`:""} ${vd.layout?`<div class="vc"><div class="vl">Layout</div><ul>${bullets(vd.layout)}</ul></div>`:""} ${(vd.creative_concept||vd.imagery_and_icons)?`<div class="vc"><div class="vl">Creative Concept</div><ul>${bullets(vd.creative_concept||vd.imagery_and_icons)}</ul></div>`:""} ${refs.length>0?`<div class="vc"><div class="vl">${refs.some(r=>r.handle?.includes("http"))?"Reference Articles":"Study These"}</div>${refs.map(r=>`<div><span class="rh">${clean(r.handle)}</span><br><span class="rn">${clean(r.note)}</span></div>`).join("")}</div>`:""}</div><hr class="hr"><div class="stitle">✨ Why This Works</div><div class="why">${clean(idea.why)}</div></div>`}).join("")}</body></html>`}
+function exportPdf(ideas,folderName){const w=window.open("","_blank");w.document.write(buildPrintHtml(ideas,folderName));w.document.close();setTimeout(()=>w.print(),500)}
+async function exportDocx(ideas,folderName,brand){try{const res=await fetch("/api/export/docx",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ideas:ideas.map(s=>({idea:s.idea,topic:s.topic,platform:s.platform})),folderName,brand})});if(!res.ok)throw new Error();const blob=await res.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`${folderName.replace(/[^a-zA-Z0-9]/g,"-")}.docx`;a.click();URL.revokeObjectURL(url)}catch{alert("Export failed.")}}
+
+// ═══ Saved View ═══
+function SavedView({savedIdeas,folders,moodBoards,setMoodBoards,onDeleteIdea,onDeleteFolder,onMoveIdea,onCreateFolder,brand}){const[af,setAf]=useState("all");const filtered=af==="all"?savedIdeas:savedIdeas.filter(s=>s.folderId===af);const[expId,setExpId]=useState(null);const[movId,setMovId]=useState(null);const[showNF,setShowNF]=useState(false);const[exporting,setExporting]=useState(null);const afName=af==="all"?"All Saved":(folders.find(f=>f.id===af)?.name||"Folder");const handleExport=async(fmt)=>{if(filtered.length===0)return;setExporting(fmt);try{if(fmt==="pdf")exportPdf(filtered,afName);else await exportDocx(filtered,afName,brand)}catch{}finally{setExporting(null)}};return(
+<>{showNF&&<NewFolderModal onSave={n=>{onCreateFolder(n);setShowNF(false)}} onClose={()=>setShowNF(false)}/>}
+<div className="saved-layout">
+  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderRadius:10,cursor:"pointer",fontSize:13,background:af==="all"?P.accentSoft:"transparent",color:af==="all"?P.text:P.textLight,fontWeight:af==="all"?700:500}} onClick={()=>setAf("all")}><span>📋 All Saved</span><span style={{fontSize:11,color:P.textLight,fontWeight:600}}>{savedIdeas.length}</span></div>
+    {folders.map(f=><div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderRadius:10,cursor:"pointer",fontSize:13,background:af===f.id?P.accentSoft:"transparent",color:af===f.id?P.text:P.textLight,fontWeight:af===f.id?700:500}} onClick={()=>setAf(f.id)}><span>📁 {f.name}</span><div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:11,color:P.textLight,fontWeight:600}}>{savedIdeas.filter(s=>s.folderId===f.id).length}</span><button style={{background:"none",border:"none",color:P.textLight,fontSize:10,opacity:0.5}} onClick={e=>{e.stopPropagation();if(window.confirm(`Delete folder "${f.name}" and all ideas in it?`))onDeleteFolder(f.id)}}>✕</button></div></div>)}
+    <button style={{padding:"10px 14px",fontSize:12,fontWeight:700,color:P.accent,background:"none",border:`1.5px dashed ${P.border}`,borderRadius:10,fontFamily:font.b,marginTop:4}} onClick={()=>setShowNF(true)}>+ New folder</button>
+  </div>
+  <div style={{display:"flex",flexDirection:"column",gap:12}}>
+    {filtered.length>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}><h3 style={{fontSize:16,fontWeight:800,margin:0,fontFamily:font.h}}>{afName}</h3><div className="export-actions"><button style={{padding:"8px 14px",fontSize:12,fontWeight:600,color:P.textMid,background:"#FFF",border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b}} onClick={()=>handleExport("pdf")} disabled={!!exporting}>{exporting==="pdf"?"Exporting...":"↓ Export PDF"}</button><button style={{padding:"8px 14px",fontSize:12,fontWeight:600,color:P.textMid,background:"#FFF",border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b}} onClick={()=>handleExport("docx")} disabled={!!exporting}>{exporting==="docx"?"Exporting...":"↓ Export Word"}</button></div></div>}
+    {filtered.length===0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"80px 20px"}}><p style={{fontSize:14,color:P.textLight}}>{af==="all"?"No saved ideas yet. Generate an idea and save it!":"This folder is empty."}</p></div>}
+    {filtered.map(saved=><div key={saved.id} style={{background:"#FFF",border:`1.5px solid ${P.border}`,borderRadius:14,padding:"16px 20px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",cursor:"pointer"}} onClick={()=>setExpId(expId===saved.id?null:saved.id)}>
+        <div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}><span style={{fontSize:11,fontWeight:700,color:P.accent,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:font.h}}>{saved.platform}</span><span style={{fontSize:11,color:P.textLight}}>{saved.topic}</span><span style={{fontSize:11,color:P.textLight,opacity:0.6}}>{new Date(saved.savedAt).toLocaleDateString()}</span></div><h4 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:P.text,lineHeight:1.35,fontFamily:font.h}}>{saved.idea.angle}</h4><span style={{fontSize:12,color:P.textLight}}>{saved.idea.format}</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <button style={{background:"none",border:`1px solid ${P.border}`,borderRadius:6,color:P.textLight,fontSize:11,fontWeight:600,padding:"4px 10px",fontFamily:font.b}} onClick={e=>{e.stopPropagation();setMovId(movId===saved.id?null:saved.id)}}>Move</button>
+          <button style={{background:"none",border:"1px solid #FECDCA",borderRadius:6,color:"#B42318",fontSize:11,fontWeight:600,padding:"4px 10px",fontFamily:font.b}} onClick={e=>{e.stopPropagation();if(window.confirm("Delete this saved idea?"))onDeleteIdea(saved.id)}}>Delete</button>
+          <span style={{color:P.textLight,fontSize:14}}>{expId===saved.id?"▲":"▼"}</span>
+        </div>
+      </div>
+      {movId===saved.id&&<div style={{display:"flex",flexDirection:"column",gap:4,padding:"10px 0",borderTop:`1px solid ${P.border}`,marginTop:10}}>{folders.filter(f=>f.id!==saved.folderId).map(f=><div key={f.id} style={{padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,color:P.textMid}} onClick={e=>{e.stopPropagation();onMoveIdea(saved.id,f.id);setMovId(null)}}>📁 {f.name}</div>)}{folders.filter(f=>f.id!==saved.folderId).length===0&&<div style={{padding:"8px 12px",fontSize:12,color:P.textLight,fontStyle:"italic"}}>No other folders</div>}</div>}
+      {expId===saved.id&&<div style={{paddingTop:12}}><IdeaCard idea={saved.idea} index={0} boardKey={`saved-${saved.id}`} moodBoards={moodBoards} setMoodBoards={setMoodBoards}/></div>}
+    </div>)}
+  </div>
+</div></>)}
+
+// ═══ Tab Content ═══
+function TabContent({tab,project,moodBoards,setMoodBoards,updateTab,requestGenerate,onSaveIdea,isIdeaSaved}){const resultsRef=useRef(null);const go=()=>{if(tab.topic.trim()&&project.brand.trim())requestGenerate(tab.id,tab.topic,tab.platform,resultsRef)};return(
+<div>
+  <div style={{background:"#FFF",border:`2px solid ${P.border}`,borderRadius:18,padding:"22px 24px",marginBottom:32,boxShadow:`4px 4px 0 ${P.shadow}`}}>
+    <div className="input-grid">
+      <div style={{flex:2.5,minWidth:200}}><label style={{display:"block",fontSize:10,fontWeight:700,color:P.textLight,letterSpacing:"0.1em",marginBottom:6,fontFamily:font.h}}>TOPIC OR KEYWORD</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={tab.topic} onChange={e=>updateTab(tab.id,{topic:e.target.value})} placeholder="foods for weight management" onKeyDown={e=>{if(e.key==="Enter")go()}}/></div>
+      <div style={{flex:0.8,minWidth:120}}><label style={{display:"block",fontSize:10,fontWeight:700,color:P.textLight,letterSpacing:"0.1em",marginBottom:6,fontFamily:font.h}}>PLATFORM</label><select style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,appearance:"none"}} value={tab.platform} onChange={e=>updateTab(tab.id,{platform:e.target.value})}>{PLATFORMS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
+      <div style={{flex:1,minWidth:140}}><button style={{width:"100%",padding:"12px 20px",fontSize:14,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:10,fontFamily:font.h,boxShadow:`3px 3px 0 ${P.shadow}`,opacity:tab.topic.trim()&&!tab.loading?1:0.4}} onClick={go} disabled={!tab.topic.trim()||tab.loading}>{tab.loading?"Packing...":"Pack my bento 🍱"}</button></div>
+    </div>
+    {(project.competitors||[]).length>0&&<div style={{display:"flex",alignItems:"center",gap:8,marginTop:14,flexWrap:"wrap"}}><span style={{fontSize:10,fontWeight:700,color:P.textLight,letterSpacing:"0.08em",fontFamily:font.h}}>ANALYZING:</span>{project.competitors.map((c,i)=><span key={i} style={{fontSize:12,fontWeight:600,color:"#9B8FE8",background:"#F0EDFF",padding:"4px 10px",borderRadius:6,border:"1px solid #DDD8F5"}}>{c}</span>)}</div>}
+  </div>
+  {tab.queued&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"80px 20px",gap:8}}><p style={{fontSize:15,color:P.textLight,fontWeight:600}}>⏳ Waiting for other tab to finish...</p><p style={{fontSize:13,color:P.textLight}}>Your request is queued and will start automatically.</p></div>}
+  {tab.loading&&!tab.queued&&<LoadingState/>}
+  {tab.error&&<div style={{background:P.accentSoft,border:`1px solid ${P.border}`,borderRadius:12,padding:"14px 20px",textAlign:"center",color:"#B42318",fontSize:13}}>{tab.error}</div>}
+  {tab.idea&&<div ref={resultsRef} style={{marginTop:4}}>
+    <div className="results-header" style={{marginBottom:20}}><p style={{fontSize:15,color:P.textLight,margin:0}}>Idea for <span style={{color:P.accent,fontWeight:700}}>"{tab.topic}"</span> on <span style={{color:P.accent,fontWeight:700}}>{tab.platform}</span></p><button style={{padding:"8px 16px",fontSize:13,fontWeight:700,color:P.accent,background:P.accentSoft,border:`1.5px solid ${P.accent}`,borderRadius:10,fontFamily:font.b,whiteSpace:"nowrap"}} onClick={go} disabled={tab.loading}>↻ Regenerate idea</button></div>
+    <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={()=>onSaveIdea(tab)} isSaved={isIdeaSaved(tab)}/>
+    <UsageCounter usage={tab.usage}/>
+  </div>}
+  {!tab.loading&&!tab.idea&&!tab.error&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:72,height:72,marginBottom:24,borderRadius:16,border:`2px solid ${P.border}`,padding:6,background:"#FFF"}}>{[0.12,0.09,0.06,0.04].map((o,i)=><div key={i} style={{background:P.text,borderRadius:6,opacity:o}}/>)}</div><p style={{fontSize:14,color:P.textLight}}>Your bento is empty. Enter a topic to start packing.</p></div>}
+</div>)}
+
+// ═══ Main App ═══
+let tabCounter=1;
+const newTab=()=>({id:`tab-${tabCounter++}`,name:"New",topic:"",platform:"Instagram",idea:null,usage:null,loading:false,queued:false,error:null});
+
+export default function Bento(){
+  const[projects,setProjects]=useState([]);const[activeProjectId,setActiveProjectId]=useState(null);
+  const[projectData,setProjectData]=useState({});const[view,setView]=useState("generate");
+  const[showSettings,setShowSettings]=useState(false);const[showSaveModal,setShowSaveModal]=useState(null);
+  const[showProjectMenu,setShowProjectMenu]=useState(false);const[creatingProject,setCreatingProject]=useState(false);
+  const[hydrated,setHydrated]=useState(false);const isGeneratingRef=useRef(false);const queueRef=useRef([]);
+  const[activeTabId,setActiveTabId]=useState(null);
+
+  const proj=projects.find(p=>p.id===activeProjectId);
+  const data=projectData[activeProjectId]||{tabs:[newTab()],savedIdeas:[],folders:[],moodBoards:{}};
+  const currentTab=data.tabs.find(t=>t.id===activeTabId)||data.tabs[0];
+
+  const setData=(updatesOrFn)=>{setProjectData(prev=>{const cur=prev[activeProjectId]||{tabs:[newTab()],savedIdeas:[],folders:[],moodBoards:{}};const updates=typeof updatesOrFn==="function"?updatesOrFn(cur):updatesOrFn;return{...prev,[activeProjectId]:{...cur,...updates}}})};
+  const updateTab=(id,updates)=>{setData(cur=>({tabs:cur.tabs.map(t=>t.id===id?{...t,...updates}:t)}))};
+
+  // Load
+  useEffect(()=>{const ps=ld("bento_projects",[]);const apId=ld("bento_active_project",null);const pd={};for(const p of ps){pd[p.id]=ld(`bento_data_${p.id}`,{tabs:[newTab()],savedIdeas:[],folders:[],moodBoards:{}});if(pd[p.id].tabs)pd[p.id].tabs=pd[p.id].tabs.map(t=>({...t,loading:false,queued:false,error:null}));const maxId=Math.max(0,...(pd[p.id].tabs||[]).map(t=>parseInt(t.id.replace("tab-",""))||0));tabCounter=Math.max(tabCounter,maxId+1)}setProjects(ps);setProjectData(pd);if(apId&&ps.find(p=>p.id===apId))setActiveProjectId(apId);setHydrated(true)},[]);
+
+  // Save
+  useEffect(()=>{if(!hydrated||projects.length===0)return;sv("bento_projects",projects);sv("bento_active_project",activeProjectId)},[projects,activeProjectId,hydrated]);
+  useEffect(()=>{if(!hydrated||!activeProjectId)return;sv(`bento_data_${activeProjectId}`,{tabs:data.tabs.map(t=>({id:t.id,name:t.name,topic:t.topic,platform:t.platform,idea:t.idea,usage:t.usage})),savedIdeas:data.savedIdeas,folders:data.folders,moodBoards:data.moodBoards})},[projectData,activeProjectId,hydrated]);
+
+  // Project actions
+  const createProject=(info)=>{const id=`proj-${Date.now()}`;setProjects(prev=>[...prev,{id,...info}]);setProjectData(prev=>({...prev,[id]:{tabs:[newTab()],savedIdeas:[],folders:[],moodBoards:{}}}));setActiveProjectId(id);setCreatingProject(false);setView("generate")};
+  const updateProject=(u)=>{setProjects(prev=>prev.map(p=>p.id===u.id?u:p))};
+  const deleteProject=(id)=>{if(projects.length<=1)return;if(!window.confirm("Delete this project and all its data?"))return;setProjects(prev=>prev.filter(p=>p.id!==id));setProjectData(prev=>{const n={...prev};delete n[id];return n});localStorage.removeItem(`bento_data_${id}`);if(activeProjectId===id)setActiveProjectId(projects.find(p=>p.id!==id)?.id)};
+
+  // Tab actions
+  const addTab=()=>{const t=newTab();setData(cur=>({tabs:[...cur.tabs,t]}));setActiveTabId(t.id)};
+  const closeTab=(id)=>{if(data.tabs.length<=1)return;const idx=data.tabs.findIndex(t=>t.id===id);const remaining=data.tabs.filter(t=>t.id!==id);setData(cur=>({tabs:cur.tabs.filter(t=>t.id!==id)}));if(activeTabId===id)setActiveTabId(remaining[Math.max(0,idx-1)]?.id)};
+
+  // Generation
+  const runGenerate=async(tabId,topic,platform,resultsRef)=>{if(!proj)return;isGeneratingRef.current=true;setData(cur=>({tabs:cur.tabs.map(t=>t.id===tabId?{...t,loading:true,queued:false,error:null,idea:null,usage:null}:t)}));try{const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic,platform,brand:proj.brand,audience:proj.audience,tone:proj.tone,brandStyle:proj.brandStyle,competitors:proj.competitors})});if(!response.ok)throw new Error();const r=await response.json();if(r.error)throw new Error(r.error);setProjectData(prev=>{const d=prev[activeProjectId]||data;return{...prev,[activeProjectId]:{...d,tabs:d.tabs.map(t=>t.id===tabId?{...t,idea:r.idea,usage:r.usage,loading:false,name:topic.length>25?topic.substring(0,25)+"...":topic}:t)}}});setTimeout(()=>{resultsRef?.current?.scrollIntoView({behavior:"smooth",block:"start"})},100)}catch(err){console.error(err);setProjectData(prev=>{const d=prev[activeProjectId]||data;return{...prev,[activeProjectId]:{...d,tabs:d.tabs.map(t=>t.id===tabId?{...t,error:"Something went wrong. Please try again.",loading:false}:t)}}})}finally{isGeneratingRef.current=false;if(queueRef.current.length>0){const next=queueRef.current.shift();runGenerate(next.tabId,next.topic,next.platform,next.resultsRef)}}};
+  const requestGenerate=(tabId,topic,platform,resultsRef)=>{if(isGeneratingRef.current){queueRef.current=queueRef.current.filter(q=>q.tabId!==tabId);queueRef.current.push({tabId,topic,platform,resultsRef});setData(cur=>({tabs:cur.tabs.map(t=>t.id===tabId?{...t,queued:true,loading:true,error:null,idea:null,usage:null}:t)}))}else{runGenerate(tabId,topic,platform,resultsRef)}};
+
+  // Save idea
+  const onSaveIdea=(tab)=>{setShowSaveModal(tab)};
+  const handleSaveToFolder=(folderId,newName)=>{const tab=showSaveModal;if(!tab?.idea)return;setData(cur=>{let fid=folderId;let updatedFolders=cur.folders;if(newName){fid=`folder-${Date.now()}`;updatedFolders=[...cur.folders,{id:fid,name:newName}]}return{folders:updatedFolders,savedIdeas:[...cur.savedIdeas,{id:`saved-${Date.now()}`,idea:tab.idea,topic:tab.topic,platform:tab.platform,folderId:fid,savedAt:Date.now()}]}});setShowSaveModal(null)};
+  const isIdeaSaved=(tab)=>tab.idea?data.savedIdeas.some(s=>s.idea.angle===tab.idea.angle&&s.topic===tab.topic):false;
+  const deleteIdea=(id)=>{setData(cur=>({savedIdeas:cur.savedIdeas.filter(s=>s.id!==id)}))};
+  const deleteFolder=(id)=>{setData(cur=>({folders:cur.folders.filter(f=>f.id!==id),savedIdeas:cur.savedIdeas.filter(s=>s.folderId!==id)}))};
+  const moveIdea=(ideaId,fid)=>{setData(cur=>({savedIdeas:cur.savedIdeas.map(s=>s.id===ideaId?{...s,folderId:fid}:s)}))};
+  const createFolder=(name)=>{setData(cur=>({folders:[...cur.folders,{id:`folder-${Date.now()}`,name}]}))};
+  const setMoodBoards=(mb)=>{setData({moodBoards:mb})};
+
+  // Render
+  if(!hydrated)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:P.bg}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:52,height:52,borderRadius:12,overflow:"hidden",border:`2px solid ${P.border}`,padding:4,background:"#FFF"}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,borderRadius:5,animation:"bentoPulse 1s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>)}</div></div>;
+  if(projects.length===0||creatingProject)return<ProjectSetup isFirst={projects.length===0} onComplete={createProject}/>;
+  if(!proj)return null;
+
+  return(
+  <div style={{minHeight:"100vh",background:P.bg}}>
+    {showSettings&&<SettingsModal project={proj} onSave={updateProject} onClose={()=>setShowSettings(false)}/>}
+    {showSaveModal&&<SaveToFolderModal key={`save-${showSaveModal.id}`} folders={data.folders.map(f=>({...f,count:data.savedIdeas.filter(s=>s.folderId===f.id).length}))} onSave={handleSaveToFolder} onClose={()=>setShowSaveModal(null)}/>}
+
+    <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",borderBottom:`2px solid ${P.border}`,background:"#FFF",position:"sticky",top:0,zIndex:20,gap:8,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>{setView("generate");setShowProjectMenu(false)}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,width:24,height:24,borderRadius:6,overflow:"hidden",border:`1.5px solid ${P.border}`}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c}}/>)}</div>
+        <span style={{fontSize:18,fontWeight:800,letterSpacing:"-0.03em",fontFamily:font.h}}>Bento</span>
+      </div>
+      <div className="header-right" style={{position:"relative",zIndex:51}}>
+        <div style={{position:"relative"}}>
+          <button style={{padding:"6px 12px",fontSize:12,fontWeight:700,border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b,background:"#FFF"}} onClick={()=>setShowProjectMenu(!showProjectMenu)}>{proj.name} ▾</button>
+          {showProjectMenu&&<><div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:49}} onClick={()=>setShowProjectMenu(false)}/><div style={{position:"absolute",top:"100%",right:0,marginTop:6,background:"#FFF",border:`1.5px solid ${P.border}`,borderRadius:12,boxShadow:`4px 4px 0 ${P.shadow}`,minWidth:200,zIndex:50,overflow:"hidden"}}>{projects.map(p=><div key={p.id} style={{padding:"10px 16px",fontSize:13,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:p.id===activeProjectId?P.accentSoft:"#FFF",fontWeight:p.id===activeProjectId?700:400}} onClick={()=>{setActiveProjectId(p.id);setShowProjectMenu(false);setView("generate")}}><span>{p.name}</span>{projects.length>1&&p.id!==activeProjectId&&<button style={{background:"none",border:"none",color:P.textLight,fontSize:10,opacity:0.5}} onClick={e=>{e.stopPropagation();deleteProject(p.id)}}>✕</button>}</div>)}<div style={{height:1,background:P.border}}/><div style={{padding:"10px 16px",fontSize:13,cursor:"pointer",color:P.textMid}} onClick={()=>{setCreatingProject(true);setShowProjectMenu(false)}}>+ New project</div></div></>}
+        </div>
+        <button style={{padding:"6px 14px",fontSize:12,fontWeight:view==="generate"?700:600,color:view==="generate"?P.text:P.textLight,background:view==="generate"?P.bg:"none",border:`1.5px solid ${view==="generate"?P.border:"transparent"}`,borderRadius:8,fontFamily:font.b}} onClick={()=>{setView("generate");setShowProjectMenu(false)}}>Generate</button>
+        <button style={{padding:"6px 14px",fontSize:12,fontWeight:view==="saved"?700:600,color:view==="saved"?P.text:P.textLight,background:view==="saved"?P.bg:"none",border:`1.5px solid ${view==="saved"?P.border:"transparent"}`,borderRadius:8,fontFamily:font.b}} onClick={()=>{setView("saved");setShowProjectMenu(false)}}>Saved{data.savedIdeas.length>0?` (${data.savedIdeas.length})`:""}</button>
+        <button style={{padding:"6px 12px",fontSize:12,fontWeight:600,color:P.textLight,background:"none",border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b}} onClick={()=>{setShowSettings(true);setShowProjectMenu(false)}}>⚙</button>
+      </div>
+    </header>
+
+    {view==="generate"&&<>
+      <div style={{display:"flex",alignItems:"center",gap:2,padding:"0 20px",borderBottom:`1.5px solid ${P.border}`,background:"#FFF",position:"sticky",top:55,zIndex:19,overflowX:"auto"}}>
+        {data.tabs.map(tab=><div key={tab.id} style={{padding:"10px 16px",fontSize:13,fontWeight:tab.id===(activeTabId||data.tabs[0]?.id)?700:500,color:tab.id===(activeTabId||data.tabs[0]?.id)?P.text:P.textLight,borderBottom:`2.5px solid ${tab.id===(activeTabId||data.tabs[0]?.id)?P.accent:"transparent"}`,cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",fontFamily:font.b}} onClick={()=>setActiveTabId(tab.id)}>
+          {tab.loading&&!tab.queued&&<span style={{display:"inline-block",animation:"spin 1s linear infinite",fontSize:12}}>⟳</span>}
+          {tab.queued&&<span style={{fontSize:12}}>⏳</span>}
+          {tab.name}
+          {data.tabs.length>1&&<button style={{background:"none",border:"none",color:P.textLight,fontSize:11,padding:"0 2px",lineHeight:1}} onClick={e=>{e.stopPropagation();closeTab(tab.id)}}>✕</button>}
+        </div>)}
+        <button style={{padding:"10px 14px",fontSize:13,fontWeight:700,color:P.accent,background:"none",border:"none",fontFamily:font.b,whiteSpace:"nowrap"}} onClick={addTab}>+ New</button>
+      </div>
+      <main style={{maxWidth:1200,margin:"0 auto",padding:"28px 20px 60px"}}>
+        <TabContent key={currentTab.id} tab={currentTab} project={proj} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} updateTab={updateTab} requestGenerate={requestGenerate} onSaveIdea={onSaveIdea} isIdeaSaved={isIdeaSaved}/>
+      </main>
+    </>}
+
+    {view==="saved"&&<main style={{maxWidth:1200,margin:"0 auto",padding:"28px 20px 60px"}}><SavedView savedIdeas={data.savedIdeas} folders={data.folders} moodBoards={data.moodBoards} setMoodBoards={setMoodBoards} onDeleteIdea={deleteIdea} onDeleteFolder={deleteFolder} onMoveIdea={moveIdea} onCreateFolder={createFolder} brand={proj.brand}/></main>}
+  </div>);
+}

@@ -100,8 +100,9 @@ function NewFolderModal({onSave,onClose}){const[name,setName]=useState("");retur
 </div></div>)}
 
 // ═══ Project Setup ═══
-function ProjectSetup({onComplete,isFirst}){const[n,setN]=useState("");const[b,setB]=useState("");const[a,setA]=useState("");const[t,setT]=useState("");const[s,setS]=useState("");const[c,setC]=useState(["","",""]);const uc=(i,v)=>{const arr=[...c];arr[i]=v;setC(arr)};const ok=n.trim()&&b.trim()&&a.trim()&&t.trim();return(
-<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}><div style={{maxWidth:540,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`}}>
+function ProjectSetup({onComplete,isFirst,onCancel}){const[n,setN]=useState("");const[b,setB]=useState("");const[a,setA]=useState("");const[t,setT]=useState("");const[s,setS]=useState("");const[c,setC]=useState(["","",""]);const uc=(i,v)=>{const arr=[...c];arr[i]=v;setC(arr)};const ok=n.trim()&&b.trim()&&a.trim()&&t.trim();return(
+<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}><div style={{maxWidth:540,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`,position:"relative"}}>
+  {!isFirst&&<button style={{position:"absolute",top:20,left:24,padding:"6px 14px",fontSize:12,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b}} onClick={onCancel}>← Back</button>}
   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,width:56,height:56,margin:"0 auto 16px",borderRadius:14,overflow:"hidden",border:`2px solid ${P.border}`}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both",animationDelay:`${i*0.08}s`}}/>)}</div>
   <h1 style={{fontSize:36,fontWeight:800,textAlign:"center",letterSpacing:"-0.04em",margin:"0 0 2px",fontFamily:font.h}}>{isFirst?"Bento":"New Project"}</h1>
   <p style={{fontSize:14,color:P.textLight,textAlign:"center",margin:"0 0 32px"}}>{isFirst?"Content ideas, neatly packed. 🍱":"Set up a new brand workspace."}</p>
@@ -218,7 +219,7 @@ export default function Bento(){
 
   // Render
   if(!hydrated)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:P.bg}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:52,height:52,borderRadius:12,overflow:"hidden",border:`2px solid ${P.border}`,padding:4,background:"#FFF"}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,borderRadius:5,animation:"bentoPulse 1s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>)}</div></div>;
-  if(projects.length===0||creatingProject)return<ProjectSetup isFirst={projects.length===0} onComplete={createProject}/>;
+  if(projects.length===0||creatingProject)return<ProjectSetup isFirst={projects.length===0} onComplete={createProject} onCancel={()=>setCreatingProject(false)}/>;
   if(!proj)return null;
 
   return(

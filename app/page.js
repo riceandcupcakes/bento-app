@@ -230,7 +230,7 @@ export default function Bento(){
   if(!authed)return(
   <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}>
     <div style={{maxWidth:400,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`,textAlign:"center"}}>
-      <img src="/bento-logo.png" alt="Bento" style={{width:80,height:80,objectFit:"contain",,display:"block",animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both"}}/>
+      <img src="/bento-logo.png" alt="Bento" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 8px",display:"block",animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both"}}/>
       <h1 style={{fontSize:32,fontWeight:800,margin:"0 0 4px",fontFamily:font.h}}>Bento</h1>
       <p style={{fontSize:14,color:P.textLight,margin:"0 0 28px"}}>Enter password to continue</p>
       <input style={{width:"100%",padding:"14px",fontSize:15,border:`1.5px solid ${loginErr?P.borderDark:P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,textAlign:"center"}} type="password" value={loginPw} onChange={e=>setLoginPw(e.target.value)} placeholder="Password" onKeyDown={e=>{if(e.key==="Enter")handleLogin()}} autoFocus/>

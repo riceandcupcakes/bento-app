@@ -69,7 +69,7 @@ function IdeaCard({idea,index,boardKey,moodBoards,setMoodBoards,onSave,isSaved})
   </div>
 </div>)}
 
-function LoadingState(){const msgs=["Researching the topic...","Crafting your brief...","Building visual direction...","Packing your bento..."];const[i,setI]=useState(0);useEffect(()=>{const t=setInterval(()=>setI(n=>(n+1)%msgs.length),2500);return()=>clearInterval(t)},[]);return<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:52,height:52,marginBottom:24,borderRadius:12,overflow:"hidden",border:`2px solid ${P.border}`,padding:4,background:"#FFF"}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,borderRadius:5,animation:"bentoPulse 1s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>)}</div><p style={{fontSize:14,color:P.textLight,fontStyle:"italic"}}>{msgs[i]}</p></div>}
+function LoadingState(){const msgs=["Researching the topic...","Crafting your brief...","Building visual direction...","Packing your bento..."];const[i,setI]=useState(0);useEffect(()=>{const t=setInterval(()=>setI(n=>(n+1)%msgs.length),2500);return()=>clearInterval(t)},[]);return<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><img src="/bento-logo.png" alt="Bento" style={{width:56,height:56,objectFit:"contain",marginBottom:24,animation:"bentoPulse 1.5s ease-in-out infinite"}}/><p style={{fontSize:14,color:P.textLight,fontStyle:"italic"}}>{msgs[i]}</p></div>}
 function UsageCounter({usage}){if(!usage)return null;return<div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,padding:"12px 0 0",opacity:0.4}}><span style={{fontSize:11,color:P.textLight,fontFamily:"monospace"}}>Tokens: {(usage.input_tokens+usage.output_tokens).toLocaleString()}</span><span style={{fontSize:11,color:"#DDD"}}>·</span><span style={{fontSize:11,color:P.textLight,fontFamily:"monospace"}}>Cost: ${usage.cost}</span></div>}
 
 // ═══ Modals ═══
@@ -103,7 +103,7 @@ function NewFolderModal({onSave,onClose}){const[name,setName]=useState("");retur
 function ProjectSetup({onComplete,isFirst,onCancel}){const[n,setN]=useState("");const[b,setB]=useState("");const[a,setA]=useState("");const[t,setT]=useState("");const[s,setS]=useState("");const[c,setC]=useState(["","",""]);const uc=(i,v)=>{const arr=[...c];arr[i]=v;setC(arr)};const ok=n.trim()&&b.trim()&&a.trim()&&t.trim();return(
 <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}><div style={{maxWidth:540,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`,position:"relative"}}>
   {!isFirst&&<button style={{position:"absolute",top:20,left:24,padding:"6px 14px",fontSize:12,fontWeight:600,color:P.textMid,background:P.bg,border:`1.5px solid ${P.border}`,borderRadius:8,fontFamily:font.b}} onClick={onCancel}>← Back</button>}
-  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,width:56,height:56,margin:"0 auto 16px",borderRadius:14,overflow:"hidden",border:`2px solid ${P.border}`}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both",animationDelay:`${i*0.08}s`}}/>)}</div>
+  <img src="/bento-logo.png" alt="Bento" style={{width:64,height:64,objectFit:"contain",margin:"0 auto 16px",display:"block",animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both"}}/>
   <h1 style={{fontSize:36,fontWeight:800,textAlign:"center",letterSpacing:"-0.04em",margin:"0 0 2px",fontFamily:font.h}}>{isFirst?"Bento":"New Project"}</h1>
   <p style={{fontSize:14,color:P.textLight,textAlign:"center",margin:"0 0 32px"}}>{isFirst?"Content ideas, neatly packed. 🍱":"Set up a new brand workspace."}</p>
   {[["Project Name",n,setN,'e.g., "Hers"'],["Brand",b,setB,"https://www.forhers.com/"]].map(([l,v,fn,ph])=><div key={l} style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:700,color:P.text,marginBottom:6,fontFamily:font.h}}>{l}</label><input style={{width:"100%",padding:"12px 14px",fontSize:14,border:`1.5px solid ${P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b}} value={v} onChange={e=>fn(e.target.value)} placeholder={ph}/></div>)}
@@ -165,7 +165,7 @@ function TabContent({tab,project,moodBoards,setMoodBoards,updateTab,requestGener
     <IdeaCard idea={tab.idea} index={0} boardKey={`${tab.id}-0`} moodBoards={moodBoards} setMoodBoards={setMoodBoards} onSave={()=>onSaveIdea(tab)} isSaved={isIdeaSaved(tab)}/>
     <UsageCounter usage={tab.usage}/>
   </div>}
-  {!tab.loading&&!tab.idea&&!tab.error&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:72,height:72,marginBottom:24,borderRadius:16,border:`2px solid ${P.border}`,padding:6,background:"#FFF"}}>{[0.12,0.09,0.06,0.04].map((o,i)=><div key={i} style={{background:P.text,borderRadius:6,opacity:o}}/>)}</div><p style={{fontSize:14,color:P.textLight}}>Your bento is empty. Enter a topic to start packing.</p></div>}
+  {!tab.loading&&!tab.idea&&!tab.error&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"100px 20px"}}><img src="/bento-logo.png" alt="Bento" style={{width:80,height:80,objectFit:"contain",marginBottom:24,opacity:0.2}}/><p style={{fontSize:14,color:P.textLight}}>Your bento is empty. Enter a topic to start packing.</p></div>}
 </div>)}
 
 // ═══ Main App ═══
@@ -179,6 +179,13 @@ export default function Bento(){
   const[showProjectMenu,setShowProjectMenu]=useState(false);const[creatingProject,setCreatingProject]=useState(false);
   const[hydrated,setHydrated]=useState(false);const isGeneratingRef=useRef(false);const queueRef=useRef([]);
   const[activeTabId,setActiveTabId]=useState(null);
+  const[authed,setAuthed]=useState(false);const[authChecking,setAuthChecking]=useState(true);
+  const[loginPw,setLoginPw]=useState("");const[loginErr,setLoginErr]=useState("");
+
+  // Auth check on mount
+  useEffect(()=>{(async()=>{const token=localStorage.getItem("bento_token");if(!token){setAuthChecking(false);return}try{const res=await fetch("/api/auth",{headers:{"x-bento-token":token}});const d=await res.json();if(d.valid)setAuthed(true);else localStorage.removeItem("bento_token")}catch{}setAuthChecking(false)})()},[]);
+  const handleLogin=async()=>{setLoginErr("");try{const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:loginPw})});const d=await res.json();if(d.success){localStorage.setItem("bento_token",d.token);setAuthed(true)}else{setLoginErr("Wrong password")}}catch{setLoginErr("Something went wrong")}};
+  const handleLogout=()=>{localStorage.removeItem("bento_token");setAuthed(false);setLoginPw("")};
 
   const proj=projects.find(p=>p.id===activeProjectId);
   const data=projectData[activeProjectId]||{tabs:[newTab()],savedIdeas:[],folders:[],moodBoards:{}};
@@ -218,7 +225,21 @@ export default function Bento(){
   const setMoodBoards=(mb)=>{setData({moodBoards:mb})};
 
   // Render
-  if(!hydrated)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:P.bg}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,width:52,height:52,borderRadius:12,overflow:"hidden",border:`2px solid ${P.border}`,padding:4,background:"#FFF"}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c,borderRadius:5,animation:"bentoPulse 1s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>)}</div></div>;
+  if(authChecking)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:P.bg}}><img src="/bento-logo.png" alt="Bento" style={{width:56,height:56,objectFit:"contain",animation:"bentoPulse 1.5s ease-in-out infinite"}}/></div>;
+
+  if(!authed)return(
+  <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`linear-gradient(135deg, ${P.bg} 0%, #FFE8EC 50%, #F0EDFF 100%)`}}>
+    <div style={{maxWidth:400,width:"100%",padding:"48px 40px",background:"#FFF",borderRadius:24,border:`2px solid ${P.border}`,boxShadow:`5px 5px 0 ${P.shadow}`,textAlign:"center"}}>
+      <img src="/bento-logo.png" alt="Bento" style={{width:64,height:64,objectFit:"contain",margin:"0 auto 16px",display:"block",animation:"cellPop 0.4s cubic-bezier(0.34,1.56,0.64,1) both"}}/>
+      <h1 style={{fontSize:32,fontWeight:800,margin:"0 0 4px",fontFamily:font.h}}>Bento</h1>
+      <p style={{fontSize:14,color:P.textLight,margin:"0 0 28px"}}>Enter password to continue</p>
+      <input style={{width:"100%",padding:"14px",fontSize:15,border:`1.5px solid ${loginErr?P.borderDark:P.border}`,borderRadius:10,background:P.bg,boxSizing:"border-box",fontFamily:font.b,textAlign:"center"}} type="password" value={loginPw} onChange={e=>setLoginPw(e.target.value)} placeholder="Password" onKeyDown={e=>{if(e.key==="Enter")handleLogin()}} autoFocus/>
+      {loginErr&&<p style={{fontSize:13,color:P.borderDark,marginTop:8}}>{loginErr}</p>}
+      <button style={{width:"100%",marginTop:16,padding:"14px",fontSize:15,fontWeight:700,color:"#FFF",background:P.accent,border:`2px solid ${P.borderDark}`,borderRadius:12,fontFamily:font.h,boxShadow:`3px 3px 0 ${P.shadow}`,opacity:loginPw.trim()?1:0.4}} onClick={handleLogin}>Enter →</button>
+    </div>
+  </div>);
+
+  if(!hydrated)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:P.bg}}><img src="/bento-logo.png" alt="Bento" style={{width:56,height:56,objectFit:"contain",animation:"bentoPulse 1.5s ease-in-out infinite"}}/></div>;
   if(projects.length===0||creatingProject)return<ProjectSetup isFirst={projects.length===0} onComplete={createProject} onCancel={()=>setCreatingProject(false)}/>;
   if(!proj)return null;
 
@@ -229,7 +250,7 @@ export default function Bento(){
 
     <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",borderBottom:`2px solid ${P.border}`,background:"#FFF",position:"sticky",top:0,zIndex:20,gap:8,flexWrap:"wrap"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>{setView("generate");setShowProjectMenu(false)}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,width:24,height:24,borderRadius:6,overflow:"hidden",border:`1.5px solid ${P.border}`}}>{[P.accent,"#9B8FE8","#6BC9A0","#F4D06F"].map((c,i)=><div key={i} style={{background:c}}/>)}</div>
+        <img src="/bento-logo.png" alt="Bento" style={{width:28,height:28,objectFit:"contain"}}/>
         <span style={{fontSize:18,fontWeight:800,letterSpacing:"-0.03em",fontFamily:font.h}}>Bento</span>
       </div>
       <div className="header-right" style={{position:"relative",zIndex:51}}>
